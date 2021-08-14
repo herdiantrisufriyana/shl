@@ -1,0 +1,2848 @@
+---
+title: ''
+# author:
+#   - name: Herdiantri Sufriyana
+#     affiliation:
+#     - &gibi Graduate Institute of Biomedical Informatics, College of Medical
+#       Science and Technology, Taipei Medical University, Taipei, Taiwan
+#     - Department of Medical Physiology, College of Medicine, University of
+#       Nahdlatul Ulama Surabaya, Surabaya, Indonesia
+#     email: herdiantrisufriyana@unusa.ac.id
+#   - name: Yu-Wei Wu
+#     affiliation:
+#     - *gibi
+#     - &tmuh Clinical Big Data Research Center, Taipei Medical University
+#       Hospital, Taipei, Taiwan
+#   - name: Emily Chia-Yu Su
+#     affiliation:
+#     - *gibi
+#     - *tmuh
+#     - Research Center for Artificial Intelligence in Medicine, Taipei Medical
+#       University, Taipei, Taiwan
+output: 
+  # pdf_document
+  word_document:
+    reference_docx: styles_shl.docx
+always_allow_html: yes
+---
+
+\tableofcontents
+\newpage
+
+# Introduction
+
+In this Supplementary Information, we describe details on this study following 
+chronological order of our analysis pipeline on systematic human learning using 
+prelabor rupture of membranes (PROM) as an outcome. There are three of six 
+sections corresponding to some sections in the main text, which are 
+respectively Introduction, Software and equipment, and Procedure. Along with 
+this PDF document, we also provide R Markdown (.Rmd) containing the same texts 
+with this document but including the programming codes for the data analysis 
+in-between of these texts. The R Markdown are available in 
+https://github.com/herdiantrisufriyana/shl. To get raw data, one need to 
+request an access from the BPJS Kesehatan for their sample dataset published in 
+August 2019. Up to this date, there are three sample datasets they published in 
+February 2019, August 2019, and December 2020. For the first and second 
+versions, a request is applied via https://e-ppid.bpjs-kesehatan.go.id/, while 
+the third is applied via https://data.bpjs-kesehatan.go.id. To preprocess the 
+raw data into the input dataset of this study, follow the codes of the R 
+Markdown in 
+https://github.com/herdiantrisufriyana/medhist/tree/main/preprocessing.
+
+# Software and equipment
+
+We set up a programming environment for this study. Bioconductor was utilized 
+as described in the main text. There were 198 R packages which are 9 base 
+packages, 36 other packages, and 91 dependencies.
+
+```{r Set up reproducible environment, include=FALSE}
+if(!require(renv)) install.packages('renv')
+if(!file.exists('renv')) renv::init(restart=F)
+```
+
+```{r Set sample kind, include=FALSE}
+# sample.kind=NULL # if using R 3.5 or earlier
+sample.kind='Rounding' # if using R 3.6 or later
+```
+
+```{r Set to run or not run very heavy computations, include=FALSE}
+# Many computations were very heavy;
+# thus, we provided the RDS files as substitutes and load only ones
+# that can be ran in most computers.
+# Set to TRUE if you want to run the very heavy computations.
+run_heavy_computation=F
+```
+
+```{r Recommended memory limit, include=FALSE}
+# Minimum 1 GB free memory should be allocated
+memory.limit(size=1000000)
+```
+
+```{r Files not included in GitHub for some reasons, eval=FALSE, include=FALSE}
+# Explicitly including data source
+# Send a data access request to the BPJS Kesehatan. Use their data and our 
+# preprocessing codes to get these files.
+
+# data/public2.rds
+# data/target_population.rds
+# data/pregnancy_status.rds
+# data/outcome.rds
+# data/target_visits.rds
+# data/annotation.rds
+# data/mh_nationwide.rds
+# data/mh_provider.rds
+# data/cf_nationwide.rds
+# data/cf_provider.rds
+# data/inferdata.rds
+# data/predidata.rds
+# data/infercause.rds
+# data/predicause.rds
+# data/int_nps.rds
+
+# Too large for GitHub (>25 mb)
+# If one needs these files below, send email to herdiantrisufriyana@unusa.ac.id.
+
+# data/calib_causal_ridge.rds
+# data/pw_bin.rds
+# data/causal_ridge.rds
+```
+
+```{r Install and set specific version of Bioconductor, include=FALSE}
+source('R/check_install_load-function.R')
+
+# Install devtools to install specific version of BiocManager.
+check_install_load('devtools',version='2.4.1',repo='cran',load=F)
+
+# Install specific version of BiocManager and Bioconductor.
+check_install_load('BiocManager',version='1.30.10',repo='cran',load=F)
+install_steps=T
+if(BiocManager::version()!='3.11'){
+  BiocManager::install(version='3.11',update=TRUE,ask=FALSE)
+  install_steps=c(F,T)
+}
+```
+
+```{r Install and load packages with specific version, include=FALSE}
+for(i in install_steps){
+  check_install_load('tidyverse','1.3.0',repo='bioc',load=i)
+  check_install_load('dslabs','0.7.3',repo='bioc',load=i)
+  check_install_load('kableExtra','1.3.1',repo='bioc',load=i)
+  check_install_load('parallel','4.0.2',repo='bioc',load=i)
+  check_install_load('doParallel','1.0.16',repo='bioc',load=i)
+  check_install_load('pbapply','1.4.3',repo='bioc',load=i)
+  check_install_load('lubridate','1.7.9',repo='bioc',load=i)
+  check_install_load('broom','0.7.3',repo='bioc',load=i)
+  check_install_load('caret','6.0.86',repo='bioc',load=i)
+  check_install_load('gmethods','0.1.0',repo='herdiantrisufriyana',load=i)
+  check_install_load('igraph','1.2.6',repo='bioc',load=i)
+  check_install_load('glmnet','4.1',repo='bioc',load=i)
+  check_install_load('gam','1.20',repo='bioc',load=i)
+  check_install_load('Biobase','2.48.0',repo='bioc',load=i)
+  check_install_load('medhist','0.1.0',repo='herdiantrisufriyana',load=i)
+  check_install_load('zeallot','0.1.0',repo='bioc',load=i)
+  check_install_load('MLeval','0.3',repo='bioc',load=i)
+  check_install_load('ggnetwork','0.5.8',repo='bioc',load=i)
+  check_install_load('visNetwork','2.0.9',repo='bioc',load=i)
+  check_install_load('ggpubr','0.4.0',repo='bioc',load=i)
+  check_install_load('extrafont','0.17',repo='bioc',load=i)
+  check_install_load('ggsci','2.9',repo='bioc',load=i)
+  check_install_load('readxl','1.3.1',repo='bioc',load=i)
+  
+  if(i){
+    options(dplyr.summarise.inform=F)
+    dslabs::ds_theme_set()
+    select=dplyr::select
+    rename=dplyr::rename
+    slice=dplyr::slice
+    renv::restore()
+  }else{
+    extrafont::font_import()
+    renv::snapshot()
+  }
+}
+
+rm(i)
+```
+
+```{r Load log for the expensive computation, include=FALSE}
+# This is needed to print messages at the time we run the expensive computation.
+source('data/log.R')
+```
+
+```{r Save package tables and the versions, eval=FALSE, include=FALSE}
+rbind(
+  
+    # The base packages
+    sessionInfo()$basePkgs %>%
+      data.frame(
+        package=.
+        ,version=
+          paste0(
+            sessionInfo()$R.version$major
+            ,'.'
+            ,sessionInfo()$R.version$minor
+          )
+        ,base='Yes'
+        ,loaded='Yes'
+        ,attached='Yes'
+      )
+    
+    # Additional packages specific to this study
+    ,sessionInfo()$otherPkgs %>%
+      lapply(function(x)data.frame(version=x$Version)) %>%
+      do.call(rbind,.) %>%
+      rownames_to_column(var='package') %>%
+      mutate(base='No',loaded='Yes',attached='Yes')
+    
+    # The explicit dependencies
+    ,sessionInfo()$loadedOnly %>%
+      lapply(function(x)data.frame(version=x$Version)) %>%
+      do.call(rbind,.) %>%
+      rownames_to_column(var='package') %>%
+      mutate(base='No',loaded='Yes',attached='No')
+    
+  ) %>%
+  setNames(str_to_sentence(colnames(.))) %>%
+  group_by(Base,Loaded,Attached) %>%
+  summarize(n=n())
+  
+  kable() %>%
+  kable_classic()
+```
+
+# Procedure
+
+Here we applied systematic human learning, as described in the main text, to 
+determine what were causal factors that can be inferred from our dataset. 
+
+## Step 1
+
+We chose PubMed for a reason described in the main text. There is no source 
+code for this step. One can choose >1 literature databases.
+
+## Step 2
+
+Keywords ‘"Fetal Membranes, Premature Rupture"[Mesh]’ were used to find a 
+document from an authoritative institution. After reading that document, we 
+wrote down the variable as a dataframe in  this source code.
+
+```{r Convenient sampling from an authoritative, include=FALSE}
+convenient_sampling=
+  matrix(
+    c('variable'
+      ,'PROM'
+      ,'Preterm birth'
+      ,'Multiple pregnancy'
+      ,'IAI'
+      ,'Previous PROM'
+      ,'Cervical shortening'
+      ,'APH'
+      ,'Low BMI'
+      ,'Low SES'
+      ,'Cigarette smoking'
+      ,'Illicit drug use'
+    )
+    ,ncol=1,byrow=T
+  ) %>%
+  `colnames<-`(.[1,]) %>%
+  .[-1,,drop=F] %>%
+  as.data.frame()
+```
+
+```{r Show convenient sampling result, eval=FALSE, include=FALSE}
+convenient_sampling %>%
+  lapply(X=seq(nrow(.)-1),Y=.,function(X,Y){
+    data.frame(
+      variable1=Y$variable[X]
+      ,variable2=Y$variable[(X+1):nrow(Y)]
+    )
+  }) %>%
+  do.call(rbind,.) %>%
+  kable() %>%
+  kable_classic()
+```
+
+## Step 3 to 5
+
+These steps are iteratives. During the these steps, we took note in this source 
+code as a dataframe. We would process this dataframe to automatically construct 
+a causal diagram in the next section.
+
+```{r Snowball sampling results, include=FALSE}
+dag=list()
+
+# Take notes while applying systematic human learning 
+# by snowball sampling based on the convenient sampling.
+dag$factor=
+  matrix(
+    c('dependent_factor','independent_factor','citation'
+      ,'Preterm birth','PROM','ACOG (2016a)'
+      ,'PROM','Previous preterm birth','ACOG (2016a)'
+      ,'PROM','Family history of preterm birth','ACOG (2016a)'
+      ,'PROM','Multiple pregnancy','ACOG (2016a)'
+      ,'PROM','IAI','ACOG (2016a)'
+      ,'PROM','Previous PROM','ACOG (2016a)'
+      ,'PROM','Cervical shortening','ACOG (2016a)'
+      ,'PROM','APH','ACOG (2016a)'
+      ,'PROM','Low BMI','ACOG (2016a)'
+      ,'PROM','Low SES','ACOG (2016a)'
+      ,'PROM','Cigarette smoking','ACOG (2016a)'
+      ,'PROM','Illicit drug use','ACOG (2016a)'
+      ,'PROM','Maternal age','Song J, et al (2019)'
+      ,'PROM','Race','Fiscella K (1996)'
+      ,'PROM','Low education','Wang W, et al (2020)'
+      ,'PROM','Stress','Wang W, et al (2020)'
+      ,'PROM','GTI','Pandey D, et al (2019); Yan JJ, et al (2016)'
+      ,'PROM','Periodontal disease','Figueiredo MGOP, et al (2019)'
+      ,'PROM','Uterine anomaly','Hua M, et al (2011)'
+      ,'PROM','Polyhydramnios','Odibo IN, et al (2016)'
+      ,'PROM','Pneumonia','Getahun D, et al (2007)'
+      ,'PROM','Tuberculosis','Fernández AA, et al (2017)'
+      ,'PROM','Assisted reproduction','Lei LL, et al (2019)'
+      ,'PROM','Chorioamnionitis','Fukami T, et al (2017)'
+      ,'PROM','Conization','Zhuang H, et al (2019)'
+      ,'PROM','Placenta on anterior wall','Torricelli M, et al (2015)'
+      ,'PROM','Asthma','Baghlaf H, et al (2019)'
+      ,'PROM','Influenza','Littauer EQ, et al (2017)'
+      
+      ,'Preterm birth','Multiple pregnancy'
+          ,'ACOG (2016b); Frey HA, and Klebanoff MA (2016)'
+      ,'Preterm birth','IAI','ACOG (2016a)'
+      ,'Preterm birth','Previous preterm birth','ACOG (2016a)'
+      ,'Preterm birth','Previous PROM','ACOG (2016a)'
+      ,'Preterm birth','Family history of preterm birth'
+          ,'Frey HA, and Klebanoff MA (2016)'
+      ,'Preterm birth','Cervical shortening','ACOG (2016a)'
+      ,'Preterm birth','APH','ACOG (2016a)'
+      ,'Preterm birth','Low BMI','ACOG (2016a)'
+      ,'Preterm birth','Low SES','ACOG (2016a)'
+      ,'Preterm birth','Cigarette smoking','ACOG (2016a)'
+      ,'Preterm birth','Illicit drug use','ACOG (2016a)'
+      ,'Preterm birth','Low education','Frey HA, and Klebanoff MA (2016)'
+      ,'Preterm birth','Maternal age','Frey HA, and Klebanoff MA (2016)'
+      ,'Preterm birth','Race','Frey HA, and Klebanoff MA (2016)'
+      ,'Preterm birth','Stress','Frey HA, and Klebanoff MA (2016)'
+      ,'Preterm birth','Depression','Frey HA, and Klebanoff MA (2016)'
+      ,'Preterm birth','UTI','Frey HA, and Klebanoff MA (2016)'
+      ,'Preterm birth','GTI','Frey HA, and Klebanoff MA (2016)'
+      ,'Preterm birth','Periodontal disease','Frey HA, and Klebanoff MA (2016)'
+      ,'Preterm birth','Uterine anomaly','Frey HA, and Klebanoff MA (2016)'
+      ,'Preterm birth','Previous stillbirth','Frey HA, and Klebanoff MA (2016)'
+      ,'Preterm birth','Induced abortion','Frey HA, and Klebanoff MA (2016)'
+      ,'Preterm birth','Polyhydramnios','Frey HA, and Klebanoff MA (2016)'
+      ,'Preterm birth','Pneumonia','Stinson LF, et al (2019)'
+      ,'Preterm birth','Typhoid','Stinson LF, et al (2019)'
+      ,'Preterm birth','Malaria','Stinson LF, et al (2019)'
+      ,'Preterm birth','Tuberculosis','Stinson LF, et al (2019)'
+      ,'Preterm birth','Pyelonephritis','Stinson LF, et al (2019)'
+      ,'Preterm birth','Assisted reproduction','Chen M, and Heilbronn LK (2017)'
+      ,'Preterm birth','Chorioamnionitis','Kim CJ, et al (2015)'
+      ,'Preterm birth','Conization','Jolley JA, and Wing DA (2008)'
+      ,'Preterm birth','LEEP loop','Jolley JA, and Wing DA (2008)'
+      ,'Preterm birth','Placenta in anterior wall','Sekiguchi A, et al (2013)'
+      ,'Preterm birth','Parity','Shechter-Maor G, et al (2020)'
+      ,'Preterm birth','Anorexia nervosa','Ante Z, et al (2020)'
+      ,'Preterm birth','Type-2 diabetes mellitus','Ringholm L, et al (2019)'
+      ,'Preterm birth','Anemia','Ardic C, et al (2019)'
+      ,'Preterm birth','Asthma','Baghlaf H, et al (2019)'
+      ,'Preterm birth','Chromosomal aberration','Toutain J, et al (2018)'
+      ,'Preterm birth','Influenza','Meijer WJ, et al (2015)'
+      ,'Preterm birth','Acute respiratory syndrome','Wong SF, et al (2004)'
+      
+      ,'Multiple pregnancy','Assisted reproduction'
+          ,'Thilaganathan B, and Khalil A (2014)'
+      ,'Multiple pregnancy','Maternal age'
+          ,paste(
+            'Thilaganathan B, and Khalil A (2014);'
+            ,'Martin JA, and Osterman MJK (2019)'
+          )
+      ,'Multiple pregnancy','Race','Martin JA, and Osterman MJK (2019)'
+      
+      ,'Chorioamnionitis','IAI','Tantengco OAG, et al (2019)'
+      ,'IAI','UTI','Tantengco OAG, et al (2019)'
+      ,'IAI','GTI','Romero R, et al (2019); Tantengco OAG, et al (2019)'
+      ,'IAI','Periodontal disease','Stinson LF, et al (2019)'
+      ,'IAI','Pneumonia','Stinson LF, et al (2019)'
+      ,'IAI','Multiple pregnancy','Lee SM, et al (2020)'
+      ,'IAI','Cervical shortening','Kiefer DG, et al (2009)'
+      ,'IAI','Race','Menon R, et al (2011)'
+      ,'IAI','Parity','Park KH, et al (2012)'
+      
+      ,'Cervical shortening','Uterine anomaly','Guimarães FHA, et al (2013)'
+      ,'Cervical shortening','Conization','Guimarães FHA, et al (2013)'
+      ,'Cervical shortening','LEEP loop','Guimarães FHA, et al (2013)'
+      ,'Cervical shortening'
+          ,'Isthmo-cervical incompetence','Guimarães FHA, et al (2013)'
+      ,'Cervical shortening','Maternal age','Tan P C, et al (2011)'
+      ,'Cervical shortening','Race','Dijkstra K, et al (1999)'
+      ,'Cervical shortening','Stress','Dijkstra K, et al (1999)'
+      ,'Cervical shortening','GTI','Sendag F, et al (2010)'
+      ,'Cervical shortening','Parity','Kang WS, et al (2010)'
+      
+      ,'APH','Maternal age','Fan D, et al (2017)'
+      ,'APH','Gestational age','Fan D, et al (2017)'
+      ,'APH','Placenta on anterior wall','Fan D, et al (2017)'
+      ,'APH','Parity','Fan D, et al (2017)'
+      ,'APH','Low SES','Bhandari S, et al (2014)'
+      ,'APH','Cigarette smoking','Bhandari S, et al (2014)'
+      ,'APH','Illicit drug use','Bhandari S, et al (2014)'
+      ,'APH','Race','Shen JJ, et al (2005)'
+      ,'APH','Assisted reproduction','Qin J, et al (2016)'
+      
+      ,'Low BMI','Anorexia nervosa','Bjørnholt SM, et al (2019)'
+      ,'Low BMI','Diet restrictions','Bjørnholt SM, et al (2019)'
+      ,'Low BMI','Stress','Han YS, et al (2011)'
+      
+      ,'Cigarette smoking','Pregnancy','Najman JM, et al (1998)'
+      ,'Cigarette smoking','Low SES','Najman JM, et al (1998)'
+      ,'Cigarette smoking','Maternal age','De Genna NM, et al (2017)'
+      ,'Cigarette smoking','Race','De Genna NM, et al (2017)'
+      ,'Cigarette smoking','Low education','De Genna NM, et al (2017)'
+      
+      ,'Illicit drug use','Low SES','Marzban M, et al (2019)'
+      ,'Illicit drug use','Cigarette smoking'
+          ,'Oga EA, et al (2018); De Genna NM, et al (2017)'
+      ,'Illicit drug use','Maternal age','Homsup P, et al (2018)'
+      ,'Illicit drug use','Race','Homsup P, et al (2018)'
+      ,'Illicit drug use','Low education','Homsup P, et al (2018)'
+      ,'Illicit drug use','Stress','Rocha PC, et al (2016)'
+      
+      ,'GTI','Type-2 diabetes mellitus','Nichols GA, et al (2017)'
+      ,'GTI','Tuberculosis','Sharma JB, et al (2018)'
+      
+      ,'Periodontal disease','Anemia','Genco RJ, and Borgnakke WS (2013)'
+      ,'Periodontal disease','Low education','Genco RJ, and Borgnakke WS (2013)'
+      ,'Periodontal disease','Allergy','Genco RJ, and Borgnakke WS (2013)'
+      ,'Periodontal disease','Maternal age','Genco RJ, and Borgnakke WS (2013)'
+      ,'Periodontal disease','Type-2 diabetes mellitus'
+          ,'Genco RJ, and Borgnakke WS (2013)'
+      ,'Periodontal disease','Cigarette smoking'
+          ,'Genco RJ, and Borgnakke WS (2013)'
+      ,'Periodontal disease','Stress','Genco RJ, and Borgnakke WS (2013)'
+      ,'Periodontal disease','Asthma','Moraschini V, et al (2018)'
+      ,'Periodontal disease','Anorexia nervosa','Chiba FY, et al (2019)'
+      
+      ,'Polyhydramnios','Fetal anomalies','Moise KJ (1997)'
+      ,'Polyhydramnios','Multiple pregnancy','Moise KJ (1997)'
+      ,'Polyhydramnios','Type-2 diabetes mellitus','Moise KJ (1997)'
+      ,'Polyhydramnios','Chromosomal aberration'
+          ,'Sagi-Dain L, and Sagi S (2015)'
+      ,'Polyhydramnios','Assisted reproduction','Lei LL, et al (2019)'
+      ,'Polyhydramnios','Anemia','Mathew M, et al (2008)'
+      
+      ,'Pneumonia','Asthma','Goodnight WH, and Soper DE (2005)'
+      ,'Pneumonia','Anemia','Goodnight WH, and Soper DE (2005)'
+      ,'Pneumonia','Varicella','Goodnight WH, and Soper DE (2005)'
+      ,'Pneumonia','Influenza','Goodnight WH, and Soper DE (2005)'
+      ,'Pneumonia','Acute respiratory syndrome'
+          ,'Goodnight WH, and Soper DE (2005)'
+      
+      ,'Tuberculosis','Race','Malhamé I, et al (2016)'
+      ,'Tuberculosis','Low SES','Malhamé I, et al (2016)'
+      ,'Tuberculosis','Asthma','Yii AC, et al (2019)'
+      ,'Tuberculosis','Influenza','de Paus RA, et al (2013)'
+      
+      ,'Chorioamnionitis','Gestational age','Kim CJ, et al (2015)'
+      ,'Chorioamnionitis','Cigarette smoking','Kim CJ, et al (2015)'
+      ,'Chorioamnionitis','Parity','Kim CJ, et al (2015)'
+      ,'Chorioamnionitis','Varicella','Kim CJ, et al (2015)'
+      ,'Chorioamnionitis','Influenza','Kim CJ, et al (2015)'
+      ,'Chorioamnionitis','Acute respiratory syndrome','Kim CJ, et al (2015)'
+      ,'Chorioamnionitis','Asthma','Baghlaf H, et al (2019)'
+      
+      ,'Conization','Cervical neoplasia','Van Calsteren K, et al (2005)'
+      
+      ,'Asthma','Varicella','Murphy VE, et al (2017)'
+      ,'Asthma','Influenza','Murphy VE, et al (2017)'
+      )
+    ,ncol=3,byrow=T
+  ) %>%
+  `colnames<-`(.[1,]) %>%
+  .[-1,] %>%
+  as.data.frame()
+```
+
+## Step 6
+
+In this step, we made a common-cause table for each causal factor. A unique set 
+of the first-level factors were identified from the common-cause table. Then, 
+we created tables of baseline edges and nodes before considering available data.
+
+```{r Construct a causal diagram, include=FALSE}
+# Make a common-cause table.
+dag$common_cause$df=
+  dag$factor %>%
+  lapply(X=seq(sum(!duplicated(.$dependent_factor))-1)
+         ,Y=pull(.,dependent_factor) %>% .[!duplicated(.)]
+         ,Z=.,function(X,Y,Z){
+    
+    data.frame(V1=Y[X],V2=Y[(X+1):length(Y)]) %>%
+      mutate(
+        
+        # Common causes
+        V1_V2=sapply(X=seq(nrow(.)),Y=V1,Z=V2,K=Z,function(X,Y,Z,K){
+          intersect(
+              filter(K,dependent_factor==Y[X])$independent_factor
+              ,filter(K,dependent_factor==Z[X])$independent_factor
+            ) %>%
+            paste(collapse=',')
+        })
+        
+        # Causes of the first variable only
+        ,V1_only=sapply(X=seq(nrow(.)),Y=V1,Z=V2,K=Z,function(X,Y,Z,K){
+          setdiff(
+              filter(K,dependent_factor==Y[X])$independent_factor
+              ,filter(K,dependent_factor==Z[X])$independent_factor
+            ) %>%
+            paste(collapse=',')
+        })
+        
+        # Causes of the second variable only
+        ,V2_only=sapply(X=seq(nrow(.)),Y=V1,Z=V2,K=Z,function(X,Y,Z,K){
+          setdiff(
+              filter(K,dependent_factor==Z[X])$independent_factor
+              ,filter(K,dependent_factor==Y[X])$independent_factor
+            ) %>%
+            paste(collapse=',')
+        })
+      )
+  }) %>%
+  do.call(rbind,.)
+
+# Identify the unique common causes.
+dag$common_cause$vec=
+  unlist(lapply(dag$common_cause$df$V1_V2,str_split,pattern=',')) %>%
+  .[.!='' & !duplicated(.)]
+
+# Bind tables for the edges.
+dag$baseline_edges=
+  rbind(
+    filter(dag$factor,dependent_factor=='PROM')
+    ,filter(dag$factor,!dependent_factor%in%c('PROM','Preterm birth')) %>%
+      filter(independent_factor %in% dag$common_cause$vec)
+  )
+
+# Construct the nodes only.
+dag$baseline_nodes=
+  
+  # Use either independent or dependent factor.
+  c(dag$baseline_edges$dependent_factor
+    ,dag$baseline_edges$independent_factor) %>%
+  .[!duplicated(.)] %>%
+  data.frame(name=.) %>%
+  
+  # Assign a code for each causal factor.
+  `rownames<-`(str_pad(seq(nrow(.)),str_count(max(nrow(.))),'left','0')) %>%
+  rownames_to_column(var='label') %>%
+  
+  # Apply different prefixes for outcome (Y), 
+  # and the first (A) and second-level factors (L)
+  mutate(
+    label=
+      paste0(
+        case_when(
+          name=='PROM'
+          ~'Y'
+          ,name %in%
+           filter(dag$factor,dependent_factor=='PROM')$independent_factor
+           ~'A'
+          ,TRUE~'L'
+        )
+        ,label
+      )
+  ) %>%
+  select(name,label)
+
+# Construct the edges that connect the common causes to the effects.
+dag$baseline_edges=
+  dag$baseline_edges %>%
+  left_join(
+    setNames(dag$baseline_nodes,c('independent_factor','from'))
+    ,by='independent_factor'
+  ) %>%
+  left_join(
+    setNames(dag$baseline_nodes,c('dependent_factor','to'))
+    ,by='dependent_factor'
+  ) %>%
+  select(from,to,citation)
+```
+
+```{r Show snowball sampling results, eval=FALSE, include=FALSE}
+# Common cause table
+dag$common_cause$df %>%
+  kable() %>%
+  kable_classic()
+
+# Outcome with the first- and second-level factors
+dag$baseline_nodes %>%
+  kable() %>%
+  kable_classic()
+
+# All edges and the citations
+dag$baseline_edges %>%
+  left_join(
+    dag$baseline_nodes %>%
+      rename(from=label) %>%
+      mutate(label=paste(from,name)) %>%
+      select(from,label)
+    ,by='from'
+  ) %>%
+  select(-from) %>%
+  rename(from=label) %>%
+  left_join(
+    dag$baseline_nodes %>%
+      rename(to=label) %>%
+      mutate(label=paste(to,name)) %>%
+      select(to,label)
+    ,by='to'
+  ) %>%
+  select(-to) %>%
+  rename(to=label) %>%
+  select(from,to,everything()) %>%
+  kable() %>%
+  kable_classic()
+```
+
+## Step 7
+
+The data source was a sample dataset of the whole health insurance database 
+during 2015 and 2016 by cross-sectional design. Stratified random sampling was 
+applied. The strata variable was constructed from 66,072 combinations of all 
+the healthcare facilities (*n*=22,024) and category of family, which were: (1) 
+a family of which members never visit the healthcare facilities; (2) a family 
+of which members have visited only primary care; and (3) a family of which 
+members have visited all levels of care. For each stratum, one to ten families 
+were randomly included. This means only 10 families were randomly included if 
+more than that number, resulting 586,969 families with 1,697,452 subjects.
+
+We conducted non-essential data cleaning, e.g. revising the inconsistent name 
+of states, estimating the healthcare identifiers, *et cetera*. These procedures 
+were parts of our R package of medhist 0.1.0. No sampling was conducted.
+
+```{r Read public data II tables from an R file, eval=FALSE, include=FALSE}
+# This is the output of the raw data after being preprocessed by data.Rmd in:
+# https://github.com/herdiantrisufriyana/medhist/preprocessing
+public=readRDS('data/public2.rds')
+```
+
+```{r Combine tables, eval=FALSE, include=FALSE}
+public$visits=
+  
+  # Access a list of visit datasets based on capitation, fee for service (FFS), 
+  # and diagnosis-related group (DRG).
+  public[c('visit_cap','visit_ffs','visit_drg')] %>%
+  
+  # For each element of the list, select 4 columns and bind the elements by row.
+  lapply(select,visit_id,subject_id,healthcare_id,admission_date) %>%
+  do.call(rbind,.) %>%
+  
+  # Join with diagnosis dataset by visit_id, follow the dataframe above.
+  left_join(public$diagnosis,by='visit_id') %>%
+  
+  # Exclude diagnoses at admission since it's unlikely definitive.
+  filter(!code_type%in%c('Admission diagnosis')) %>%
+  select(-code_type) %>%
+  
+  # Find the earliest visit per subject and filter only the unique visits.
+  group_by(subject_id) %>%
+  mutate(db_start_date=min(admission_date)) %>%
+  ungroup() %>%
+  filter(!duplicated(.))
+```
+
+After the non-essential data cleaning, we applied retrospective cohort design, 
+as described in the main text. For pregnant women, we use several codes for 
+determining delivery or immediately after delivery care. The 220 codes are 
+described.
+
+```{r Determine target population, eval=FALSE, include=FALSE}
+public$target_population=
+  
+  ##### The health insurance holders of #####
+  public$subject %>%
+  lapply(X=1,Y=.,function(X,Y){
+    # Record this step to the table of subject selection
+    data.frame(
+        step='total'
+        ,exc_visit=0
+        ,inc_visit=sum(public$visits$subject_id %in% Y$subject_id)
+        ,exc_subject=0
+        ,inc_subject=nrow(Y)
+      ) %>%
+      saveRDS('data/selection.rds')
+    Y
+  }) %>%
+  .[[1]]
+
+public$target_population=
+  
+  public$target_population %>%
+
+  ##### 12-to-55-years-old (at visit between 2015 and 2016) #####
+  filter(
+    between(as.duration(as_date('2015-01-01')-birth_date)/dyears(1),12,55) |
+    between(as.duration(as_date('2016-12-31')-birth_date)/dyears(1),12,55)
+  ) %>%
+  lapply(X=1,Y=.,function(X,Y){
+    # Record this step to the table of subject selection.
+    readRDS('data/selection.rds') %>%
+      rbind(
+        data.frame(
+          step='age selection by 12 to 55 years old'
+          ,exc_visit=
+            .$inc_visit[nrow(.)]
+            -sum(public$visits$subject_id %in% Y$subject_id)
+          ,inc_visit=sum(public$visits$subject_id %in% Y$subject_id)
+          ,exc_subject=.$inc_subject[nrow(.)]-nrow(Y)
+          ,inc_subject=nrow(Y)
+        )
+      ) %>%
+      saveRDS('data/selection.rds')
+    Y
+  }) %>%
+  .[[1]] %>%
+
+  ##### females #####
+  filter(sex=='female') %>%
+  lapply(X=1,Y=.,function(X,Y){
+    # Record this step to the table of subject selection.
+    readRDS('data/selection.rds') %>%
+      rbind(
+        data.frame(
+          step='sex selection by female'
+          ,exc_visit=
+            .$inc_visit[nrow(.)]
+            -sum(public$visits$subject_id %in% Y$subject_id)
+          ,inc_visit=sum(public$visits$subject_id %in% Y$subject_id)
+          ,exc_subject=.$inc_subject[nrow(.)]-nrow(Y)
+          ,inc_subject=nrow(Y)
+        )
+      ) %>%
+      saveRDS('data/selection.rds')
+    Y
+  }) %>%
+  .[[1]] %>%
+
+  ##### who visit healthcare providers #####
+  filter(subject_id%in%public$visits$subject_id) %>%
+  lapply(X=1,Y=.,function(X,Y){
+    # Record this step to the table of subject selection.
+    readRDS('data/selection.rds') %>%
+      rbind(
+        data.frame(
+          step='visit healthcare providers'
+          ,exc_visit=
+            .$inc_visit[nrow(.)]
+            -sum(public$visits$subject_id %in% Y$subject_id)
+          ,inc_visit=sum(public$visits$subject_id %in% Y$subject_id)
+          ,exc_subject=.$inc_subject[nrow(.)]-nrow(Y)
+          ,inc_subject=nrow(Y)
+        )
+      ) %>%
+      saveRDS('data/selection.rds')
+    Y
+  }) %>%
+  .[[1]]
+```
+
+```{r Determine pregnant women of target population, eval=FALSE, include=FALSE}
+public$pregnancy_status=
+  
+  # Get pregnancy status of the target population.
+  public$target_population %>%
+  lapply(X=1,Y=.,Z=public$visits,K=public$annotation,function(X,Y,Z,K){
+    
+    # Use these regular expression for the target population
+    # to find codes related to pregnancy.
+    L=Z %>%
+      filter(subject_id%in%Y$subject_id) %>%
+      left_join(K,by='code') %>%
+      filter(
+        str_detect(
+          str_to_lower(paste(code,desc))
+          ,paste0(c(
+              'obstet'
+              ,'pregnan'
+              ,'labou?r\\s+'
+              ,'deliver'
+              ,'cesar'
+              ,'natal'
+              ,'z3[3467]'
+              ,'o\\d+'
+            ),collapse='|')
+        )
+      )
+    
+    # From the pregnancy-related visits, find the earliest and the latest.
+    M=L %>%
+      group_by(subject_id) %>%
+      summarize(
+        preg_e=min(admission_date)
+        ,preg_l=max(admission_date)
+        ,.groups='drop'
+      ) %>%
+      ungroup()
+    
+    # Find the related codes for the end of pregnancy.
+    N=L %>%
+      
+      # This may include the false-positive codes
+      filter(
+        str_detect(
+          str_to_lower(paste(code,desc))
+          ,paste0(c(
+            'abort'
+            ,'deliver'
+            ,'cesar'
+            ,'labou?r\\s+'
+            ,'natal'
+            ,'postpartum'
+            ,'terminat'
+            ,'o0[0123]'
+            ,'o152'
+            ,'o364'
+            ,'o63'
+            ,'o7[02]'
+            ,'o8[579]'
+            ,'o90'
+            ,'z3[79]'
+          ),collapse='|')
+        )
+      ) %>%
+      
+      # By manual inspection, exclude the false-positive codes.
+      filter(!(
+        str_detect(
+          str_to_lower(paste(code,desc))
+          ,paste0(c(
+            'aborter'
+            ,'ante'
+            ,'peri'
+            ,'delayed'
+            ,'false'
+            ,'failed'
+            ,'prenatal'
+            ,'threatened'
+            ,'o311'
+            ,'z351'
+            ,'o600'
+            ,'o96'
+          ),collapse='|')
+        ) &
+        !str_detect(
+          str_to_lower(code)
+          ,paste0(c(
+            'o0[34568]'
+            ,'o15[12]'
+            ,'o7[02]'
+            ,'o8[79]'
+          ),collapse='|')
+        )
+      )) %>%
+      
+      # Record the codes for the end of pregnancy. 
+      lapply(X=1,Y=.,function(X,Y){
+        saveRDS(Y,'data/termination_codes.rds')
+        Y
+      }) %>%
+      .[[1]] %>%
+      
+      # Find the earliest and latest dates of 
+      # the related codes for  the end of pregnancy.
+      group_by(subject_id) %>%
+      summarize(
+        termin_e=min(admission_date)
+        ,termin_l=max(admission_date)
+        ,.groups='drop'
+      ) %>%
+      ungroup()
+    
+    # Get visits after the end of the first pregnancy in the dataset period.
+    O=L %>%
+      left_join(N,by='subject_id') %>%
+      filter(admission_date>termin_l)
+    
+    # Get the earliest date of the second-pregnancy visits.
+    P=O %>%
+      group_by(subject_id) %>%
+      summarize(
+        preg_e2=min(admission_date)
+        ,.groups='drop'
+      ) %>%
+      ungroup()
+    
+    # Find the related codes for the end of the second pregnancy.
+    Q=O %>%
+      
+      # This may include the false-positive codes
+      filter(
+        str_detect(
+          str_to_lower(paste(code,desc))
+          ,paste0(c(
+            'abort'
+            ,'deliver'
+            ,'cesar'
+            ,'labou?r\\s+'
+            ,'natal'
+            ,'postpartum'
+            ,'terminat'
+            ,'o0[0123]'
+            ,'o152'
+            ,'o364'
+            ,'o63'
+            ,'o7[02]'
+            ,'o8[579]'
+            ,'o90'
+            ,'z3[79]'
+          ),collapse='|')
+        )
+      ) %>%
+      
+      # By manual inspection, exclude the false-positive codes.
+      filter(!(
+        str_detect(
+          str_to_lower(paste(code,desc))
+          ,paste0(c(
+            'aborter'
+            ,'ante'
+            ,'peri'
+            ,'delayed'
+            ,'false'
+            ,'failed'
+            ,'prenatal'
+            ,'threatened'
+            ,'o311'
+            ,'z351'
+            ,'o600'
+            ,'o96'
+          ),collapse='|')
+        ) &
+        !str_detect(
+          str_to_lower(code)
+          ,paste0(c(
+            'o0[34568]'
+            ,'o15[12]'
+            ,'o7[02]'
+            ,'o868'
+            ,'o8[79]'
+          ),collapse='|')
+        )
+      )) %>%
+      
+      # Find the earliest and latest dates of 
+      # the related codes for  the end of the second pregnancy.
+      group_by(subject_id) %>%
+      summarize(
+        termin_e2=suppressWarnings(min(admission_date))
+        ,termin_l2=suppressWarnings(max(admission_date))
+        ,.groups='drop'
+      ) %>%
+      ungroup()
+    
+    # Join offset dates to find the pregnancy periods.
+    R=M %>%
+      left_join(N,by='subject_id') %>%
+      left_join(P,by='subject_id') %>%
+      left_join(Q,by='subject_id') %>%
+      select(
+        subject_id
+        ,preg_e
+        ,termin_e
+        ,termin_l
+        ,preg_e2
+        ,termin_e2
+        ,termin_l2
+        ,preg_l
+        ,everything()
+      )
+    
+    # Join the offset dates to the target population data
+    # and compute the number of either gestation and termination.
+    S=Y %>%
+      left_join(R,by='subject_id') %>%
+      mutate(
+        gestation=
+          as.integer(!is.na(preg_e))
+          + as.integer(!is.na(preg_e2))
+        ,termination=
+          as.integer(!is.na(termin_l))
+          + as.integer(!is.na(termin_l2))
+      )
+    
+    # Filtered by gestation, select different offsets depending on
+    # the pregnancy period, and combine the filtering results. 
+    # This separates 2 pregnancy periods of a subject into 2 instances.
+    rbind(
+        filter(S,gestation==0) %>%
+          select(
+            subject_id,preg_e,termin_e,termin_l,preg_l,gestation,termination
+          ) %>%
+          mutate(gestation_n=0)
+        ,filter(S,gestation==1) %>%
+          select(
+            subject_id,preg_e,termin_e,termin_l,preg_l,gestation,termination
+          ) %>%
+          mutate(gestation_n=1)
+        ,filter(S,gestation==2) %>%
+          select(
+            subject_id,preg_e,termin_e,termin_l,preg_l,gestation,termination
+          ) %>%
+          mutate(gestation_n=1)
+        ,filter(S,gestation==2) %>%
+          select(
+            subject_id,preg_e2,termin_e2,termin_l2,preg_l,gestation,termination
+          ) %>%
+          rename(preg_e=preg_e2,termin_e=termin_e2,termin_l=termin_l2) %>%
+          mutate(gestation_n=2)
+      ) %>%
+      
+      # If no termination for a pregnancy period of a subject,
+      # then label the period as having censored outcome.
+      mutate(censoring=is.na(termin_l)) %>%
+      
+      # Join to the target population data and arranged by subject_id
+      left_join(
+        S %>%
+          select(
+            -preg_e
+            ,-termin_e
+            ,-termin_l
+            ,-preg_e2
+            ,-termin_e2
+            ,-termin_l2
+            ,-preg_l
+            ,-gestation
+            ,-termination
+          )
+        ,by='subject_id'
+      ) %>%
+      arrange(
+        factor(subject_id,S$subject_id %>% .[!duplicated(.)])
+      )
+    
+  }) %>%
+  .[[1]]
+```
+
+```{r Save termination codes as CSV, eval=FALSE, include=FALSE}
+readRDS('data/termination_codes.rds') %>%
+  
+  # By manual inspection, check the termination codes.
+  select(code,desc) %>%
+  filter(!duplicated(.)) %>%
+  arrange(code) %>%
+  
+  rename(description=desc) %>%
+  setNames(str_to_title(colnames(.))) %>%
+  
+  kable() %>%
+  kable_classic()
+```
+
+```{r Determine outcome, eval=FALSE, include=FALSE}
+public$outcome=
+  
+  # Filter visits from the target population only.
+  public$visits %>%
+  filter(subject_id %in% public$target_population$subject_id) %>%
+  
+  # Extract outcome, which is O42.
+  extract_outcome(
+    icd10_event='O42'
+    ,latest_event=min
+    ,day_to_event=0
+    ,icd10_nonevent=''
+    ,latest_nonevent=max
+    ,day_to_nonevent=0
+    ,verbose=0
+  ) %>%
+  
+  # Join the pregnancy status data to the outcome data.
+  left_join(public$pregnancy_status,by='subject_id') %>%
+  
+  # If non-event, the latest date should be 
+  # the earliest date of the end of pregnancy.
+  lapply(X=1,Y=.,function(X,Y){
+    Z=Y %>%
+      filter(!censoring & outcome=='nonevent') %>%
+      mutate(latest_date=termin_e)
+    K=Y %>%
+      filter(!(!censoring & outcome=='nonevent'))
+    rbind(Z,K) %>%
+      arrange(factor(subject_id,unique(Y$subject_id)))
+  }) %>%
+  .[[1]] %>%
+  
+  # Get only column to filter visits before the outcome 
+  # for each pregnancy episode.
+  select(subject_id,latest_date,outcome,censoring,gestation_n)
+```
+
+```{r Determine target visits, eval=FALSE, include=FALSE}
+public$target_visits=
+  
+  # Join the outcome data to the visit data.
+  public$outcome %>%
+  right_join(public$visits,by='subject_id') %>%
+  select(visit_id, everything()) %>%
+  
+  # If the outcome is censored, take visits up to the outcome date.
+  # Otherwise, take all visits.
+  filter(!is.na(censoring)) %>%
+  filter(censoring | (!censoring & admission_date<=latest_date)) %>%
+  mutate(code=ifelse(is.na(code)|code=='','NA',code)) %>%
+  
+  # Take only codes that are available 
+  # in all combinations of outcome and censoring status.
+  lapply(X=1,Y=.,function(X,Y){
+    Z=Y %>%
+      select(outcome,censoring,code) %>%
+      filter(!duplicated(.)) %>%
+      mutate(count=1) %>%
+      group_by(code) %>%
+      summarize(count=sum(count)) %>%
+      arrange(desc(count)) %>%
+      filter(count==4) %>%
+      pull(code)
+    
+    Y %>% filter(code%in%Z)
+  }) %>%
+  .[[1]] %>%
+  
+  # Take needed columns and make subject_id different 
+  # between pregnancy episodes of the same subject.
+  select(-censoring,-outcome,-latest_date) %>%
+  unite(subject_id,subject_id,gestation_n,sep='.')
+```
+
+```{r Update related variables, eval=FALSE, include=FALSE}
+# Take only subjects' outcome that are assigned to the target visits.
+public$outcome2=
+  public$outcome %>%
+  unite(subject_id,subject_id,gestation_n,sep='.') %>%
+  filter(subject_id%in%public$target_visits$subject_id)
+
+# Take only subjects' pregnancy status that are assigned to the target visits.
+public$pregnancy_status2=
+  public$pregnancy_status %>%
+  unite(subject_id,subject_id,gestation_n,sep='.') %>%
+  filter(subject_id%in%public$target_visits$subject_id)
+
+# Add more criterion to the target population.
+public$target_population2=
+  
+  public$target_population %>%
+  left_join(
+    select(public$pregnancy_status,subject_id,gestation_n)
+    ,by=c('subject_id')
+  ) %>%
+  unite(subject_id,subject_id,gestation_n,sep='.') %>%
+  
+  ##### before the latest date of event/non-event #####
+  ##### and split if >1 pregnancies #####
+  filter(subject_id%in%public$target_visits$subject_id) %>%
+  lapply(X=1,Y=.,function(X,Y){
+    # Record this step to the table of subject selection.
+    step_desc='up to the latest date for uncensored and split if >1 pregnancies'
+    readRDS('data/selection.rds') %>%
+      filter(step!=step_desc) %>%
+      rbind(
+        data.frame(
+          step=step_desc
+          ,exc_visit=
+            .$inc_visit[nrow(.)]
+            -sum(public$target_visits$subject_id %in% Y$subject_id)
+          ,inc_visit=sum(public$target_visits$subject_id %in% Y$subject_id)
+          ,exc_subject=.$inc_subject[nrow(.)]-nrow(Y)
+          ,inc_subject=nrow(Y)
+        )
+      ) %>%
+      saveRDS('data/selection.rds')
+    Y
+  }) %>%
+  .[[1]]
+```
+
+```{r Describe selection results for sanity check, eval=FALSE, include=FALSE}
+readRDS('data/selection.rds') %>%
+  kable() %>%
+  kable_classic()
+```
+
+```{r Describe pregnancy status, eval=FALSE, include=FALSE}
+public$pregnancy_status %>%
+  
+  # Summarize the number and proportion of subjects with 0 to 2 gestation.
+  select(subject_id,gestation) %>%
+  filter(!duplicated(.)) %>%
+  group_by(gestation) %>%
+  summarize(n=n(),.groups='drop') %>%
+  mutate(p=n/sum(n)) %>%
+  
+  # Join to compare with the subjects' pregnancy status 
+  # that are assigned to the target visits.
+  left_join(
+    public$pregnancy_status2 %>%
+      separate(subject_id,c('subject_id','gestation_n'),sep='\\.') %>%
+      select(subject_id,gestation) %>%
+      filter(!duplicated(.)) %>%
+      group_by(gestation) %>%
+      summarize(n2=n(),.groups='drop') %>%
+      mutate(p2=n2/sum(n2))
+    ,by='gestation'
+  ) %>%
+  kable() %>%
+  kable_classic()
+```
+
+```{r Describe outcome per pregnancy status, eval=FALSE, include=FALSE}
+public$pregnancy_status %>%
+  
+  # Join the ourcome data to the pregnancy status data.
+  left_join(public$outcome,by=c('subject_id','gestation_n','censoring')) %>%
+  
+  # Summarize the number and proportion of subjects 
+  # by combination of censoring status, outcome, and number of gestation.
+  group_by(gestation_n,outcome,censoring) %>%
+  summarize(n=n(),.groups='drop') %>%
+  mutate(p=n/sum(n)) %>%
+  
+  # Join to compare with the subjects' pregnancy status 
+  # that are assigned to the target visits.
+  left_join(
+    public$pregnancy_status2 %>%
+      separate(subject_id,c('subject_id','gestation_n'),sep='\\.') %>%
+      left_join(
+        public$outcome2 %>%
+          separate(subject_id,c('subject_id','gestation_n'),sep='\\.')
+        ,by=c('subject_id','gestation_n','censoring')
+      ) %>%
+      mutate(gestation_n=as.numeric(gestation_n)) %>%
+      group_by(gestation_n,outcome,censoring) %>%
+      summarize(n2=n(),.groups='drop') %>%
+      mutate(p2=n2/sum(n2))
+    ,by=c('gestation_n','outcome','censoring')
+  ) %>%
+  kable() %>%
+  kable_classic()
+```
+
+```{r Save selection results to RDS file, eval=FALSE, include=FALSE}
+saveRDS(public$target_population2,'data/target_population.rds')
+saveRDS(public$pregnancy_status2,'data/pregnancy_status.rds')
+saveRDS(public$outcome2,'data/outcome.rds')
+saveRDS(public$target_visits,'data/target_visits.rds')
+saveRDS(public$annotation,'data/annotation.rds')
+```
+
+```{r Remove public data II after selection, eval=FALSE, include=FALSE}
+rm(public)
+```
+
+We conducted data preprocessing after defining the target population and 
+sampling it retrospectively. Demographics were included as categorical 
+variables for causal inference. We also computed a number of days for a code in 
+the latest encounter before the time of prediction, including those by codes as 
+a causal factor.
+
+```{r Load an outcome table, include=FALSE}
+outcome=
+  readRDS('data/outcome.rds') %>%
+  left_join(
+    readRDS('data/pregnancy_status.rds')
+    ,by=c('subject_id','censoring')
+  ) %>%
+  rename(reghc_id=healthcare_id)
+```
+
+```{r Visits with categorical identity as additional variables, include=FALSE}
+visit_cip=
+  
+  # Transform age into a categorical variable based on domain knowledge.
+  outcome %>%
+  mutate(
+    age=case_when(
+      ((latest_date-birth_date)/dyears(1))<20~'Too Young'
+      ,(((latest_date-birth_date)/dyears(1))>=20 &
+        ((latest_date-birth_date)/dyears(1))<=35)
+       ~'Low Risk'
+      ,((latest_date-birth_date)/dyears(1))>35~'Too Old'
+      ,TRUE~'NA'
+    )
+  ) %>%
+  
+  # Select subject_id and all categorical variables (not medical history).
+  select(subject_id,age,marital_status,insurance_class,occupation_segment) %>%
+  gather(variable,value,-subject_id) %>%
+  unite(desc,variable,value,sep='_') %>%
+  mutate(desc=str_replace_all(desc,'_|-|\\s',' ')) %>%
+  separate(desc,c('first_word','desc'),sep=' ',extra='merge') %>%
+  mutate_at('first_word',str_to_sentence) %>%
+  unite(desc,first_word,desc,sep=' ') %>%
+  
+  # Create a code for each category.
+  lapply(X=1,Y=.,function(X,Y){
+    select(.,desc) %>%
+      filter(!duplicated(.)) %>%
+      
+      # Create a code for each categorical variable.
+      mutate(code=sapply(desc,function(x){
+        str_split(x,'\\s')[[1]] %>%
+          substr(1,1) %>%
+          paste(collapse='') %>%
+          str_to_upper()
+      })) %>%
+      
+      # For each code, assign number to non-single code.
+      group_by(code) %>%
+      mutate(code_seq=seq(n()),max_code_seq=n()) %>%
+      ungroup() %>%
+      unite(code2,code,code_seq,sep='',remove=F) %>%
+      mutate(code=ifelse(max_code_seq==1,code,code2)) %>%
+      
+      # Save all categorical variables and the codes.
+      select(code,desc) %>%
+      saveRDS('data/cat_identity.rds')
+    Y
+  }) %>%
+  .[[1]] %>%
+  
+  # Join the codes of the categorical variables.
+  left_join(readRDS('data/cat_identity.rds'),by='desc') %>%
+  
+  # Join the target visits.
+  left_join(
+    readRDS('data/target_visits.rds') %>%
+      select(-code) %>%
+      mutate(seq=seq(nrow(.))) %>%
+      select(seq,everything())
+    ,by='subject_id'
+  ) %>%
+  
+  # Select columns according to the standard for medhist.
+  select(
+    seq
+    ,visit_id
+    ,subject_id
+    ,healthcare_id
+    ,admission_date
+    ,code
+    ,db_start_date
+  ) %>%
+  
+  # Add the categorical variables as if these are diagnosis/procedure codes 
+  # of which dates are the dates of any codes in a visit of a subject.
+  rbind(
+    readRDS('data/target_visits.rds') %>%
+      mutate(seq=seq(nrow(.))) %>%
+      select(seq,everything())
+  )
+```
+
+We also determined the diagnosis and procedure codes that represented each 
+causal factor. In this causal diagram, a measured causal factor was depicted, 
+as described in the main text. Eventually, we recoded any code assigned to a 
+causal factor into the name of that factor.
+
+```{r Determine measurement of causal factors, include=FALSE}
+# Add measurement variables.
+dag$measure_edges=
+  dag$baseline_nodes %>%
+  select(label) %>%
+  rename(from=label) %>%
+  mutate(to=paste0(from,'*'),citation=NA)
+
+# Define components of each causal factor by ICD-10 coding.
+dag$measure_nodes=
+  dag$baseline_nodes %>%
+  mutate(
+    regex=case_when(
+      name=='PROM'~'O42'
+      ,name=='Multiple pregnancy'~'O3[01]'
+      ,name=='Chorioamnionitis'~'O411'
+      ,name=='IAI'~'O41[89]'
+      ,name=='Cervical shortening'~'6751'
+      ,name=='APH'~'O46'
+      ,name=='Illicit drug use'~'F19'
+      ,name=='GTI'~'914[139]|A6[03]|O23[59]|R87'
+      ,name=='Periodontal disease'~'K05'
+      ,name=='Polyhydramnios'~'O40'
+      ,name=='Pneumonia'~'J1[23458]'
+      ,name=='Tuberculosis'~'A1[569]'
+      ,name=='Asthma'~'J4[56]'
+      ,name=='Low SES'~'THIRD|UNEMPLOYED'
+      ,name=='Maternal age'~'TOO YOUNG|TOO OLD'
+      ,name=='Uterine anomaly'~'Q51'
+      ,name=='Assisted reproduction'~'Z31|N98'
+      ,name=='Influenza'~'J(00|09|10|11)'
+      ,name=='UTI'~'N390|O23[01249]'
+      ,name=='Parity'~'Z641'
+      ,name=='Anorexia nervosa'~'F500|R63[0346]'
+      ,name=='Type-2 diabetes mellitus'~'E1[124]'
+      ,name=='Anemia'~'D5[^4]|D6[0-4]'
+      ,name=='Chromosomal aberration'~'Q9'
+      ,name=='Varicella'~'B01'
+      ,name=='Acute respiratory syndrome'~'J80'
+      ,TRUE~''
+    )
+  ) %>%
+  filter(regex!='') %>%
+  lapply(X=seq(nrow(.)),Y=.,function(X,Y){
+    data.frame(name=Y$regex[X],label=paste0(Y$label[X],'*'))
+  }) %>%
+  do.call(rbind,.)
+
+# For each measurement variable, add unmeasured variable 
+# as a factor that affects the measurement variable.
+dag$measure_edges=
+  dag$measure_edges %>%
+  filter(to %in% dag$measure_nodes$label) %>%
+  rbind(mutate(.,from=str_replace_all(from,'[:alpha:]','U')))
+
+# Assign labels of measurement variables with the ICD-10 codes.
+dag$measure_nodes %>%
+  lapply(X=seq(nrow(.))
+         ,Y=.
+         ,Z=
+           readRDS('data/cat_identity.rds') %>%
+           rbind(readRDS('data/annotation.rds'))
+         ,function(X,Y,Z){
+    
+    if(Y$label[X]%in%c('A19*','A20*')){
+      K=Z %>%
+        filter(!str_detect(str_to_upper(code),'[:digit:]')) %>%
+        filter(str_detect(str_to_upper(desc),Y$name[X]))
+    }else{
+      K=Z %>% filter(str_detect(str_to_upper(code),Y$name[X]))
+    }
+    
+    K %>%
+      mutate(label=Y$label[X]) %>%
+      select(label,code,desc)
+    
+  }) %>%
+  do.call(rbind,.) %>%
+  kable() %>%
+  kable_classic()
+```
+
+```{r Show all available data or measures, eval=FALSE, include=FALSE}
+dag$measure_edges %>%
+  kable() %>%
+  kable_classic()
+```
+
+```{r Compute nationwide day interval of medical history, include=FALSE}
+if(run_heavy_computation){
+  mh_nationwide=
+    readRDS('data/target_visits.rds') %>%
+    mutate(healthcare_id='nationwide') %>%
+    extract_medical_history(cl=detectCores()-1)
+  saveRDS(mh_nationwide,'data/mh_nationwide.rds')
+}else{
+  cat(readRDS('data/log.rds')[['mh_nationwide']])
+  mh_nationwide=readRDS('data/mh_nationwide.rds')
+}
+```
+
+```{r Compute provider-wise day interval of medical history, include=FALSE}
+if(run_heavy_computation){
+  mh_provider=
+    readRDS('data/target_visits.rds') %>%
+    extract_medical_history(cl=detectCores()-1)
+  saveRDS(mh_provider,'data/mh_provider.rds')
+}else{
+  cat(readRDS('data/log.rds')[['mh_provider']])
+  mh_provider=readRDS('data/mh_provider.rds')
+}
+```
+
+```{r Compute nationwide day interval of causal factor, include=FALSE}
+if(run_heavy_computation){
+  cf_nationwide=
+    
+    # Exclude outcome.
+    dag$measure_nodes %>%
+    filter(label!='Y01*') %>%
+    
+    # For each causal factor, filter rows with the codes related to the factor 
+    # regardless the healthcare facilities.
+    lapply(X=seq(nrow(.))
+           ,Y=.
+           ,Z=
+             visit_cip %>%
+             mutate(healthcare_id='nationwide') %>%
+             left_join(
+               readRDS('data/cat_identity.rds') %>%
+                 rbind(annotation)
+               ,by='code'
+             )
+           ,function(X,Y,Z){
+      
+      if(Y$label[X]%in%c('A19*','A20*')){
+        K=Z %>%
+          filter(!str_detect(str_to_upper(code),'[:digit:]')) %>%
+          filter(str_detect(str_to_upper(desc),Y$name[X]))
+      }else{
+        K=Z %>% filter(str_detect(str_to_upper(code),Y$name[X]))
+      }
+      
+      K %>%
+        select(-desc) %>%
+        mutate(
+          code=
+            Y$label[X] %>%
+            str_remove_all('\\*')
+        )
+      
+    }) %>%
+    do.call(rbind,.) %>%
+    filter(!duplicated(.)) %>%
+    select(-seq) %>%
+    
+    # Extract the day intervals.
+    extract_medical_history(cl=detectCores()-1) %>%
+    filter(!duplicated(.)) %>%
+    
+    # Join to the target visits.
+    right_join(
+      readRDS('data/target_visits.rds') %>%
+        select(-code) %>%
+        mutate(healthcare_id='nationwide')
+      ,by=c('visit_id'
+            ,'subject_id'
+            ,'healthcare_id'
+            ,'admission_date'
+            ,'db_start_date')
+    ) %>%
+    select(
+      visit_id
+      ,subject_id
+      ,healthcare_id
+      ,admission_date
+      ,db_start_date
+      ,everything()
+    )
+  
+  saveRDS(cf_nationwide,'data/cf_nationwide.rds')
+}else{
+  cat(readRDS('data/log.rds')[['cf_nationwide']])
+  cf_nationwide=readRDS('data/cf_nationwide.rds')
+}
+```
+
+```{r Compute provider-wise day interval of causal factor, include=FALSE}
+if(run_heavy_computation){
+  cf_provider=
+    
+    # Exclude outcome.
+    dag$measure_nodes %>%
+    filter(label!='Y01*') %>%
+    
+    # For each causal factor, filter rows with the codes related to the factor 
+    # in each of the healthcare facilities.
+    lapply(X=seq(nrow(.))
+           ,Y=.
+           ,Z=
+             visit_cip %>%
+             left_join(
+               readRDS('data/cat_identity.rds') %>%
+                 rbind(annotation)
+               ,by='code'
+             )
+           ,function(X,Y,Z){
+      
+      if(Y$label[X]%in%c('A19*','A20*')){
+        K=Z %>%
+          filter(!str_detect(str_to_upper(code),'[:digit:]')) %>%
+          filter(str_detect(str_to_upper(desc),Y$name[X]))
+      }else{
+        K=Z %>% filter(str_detect(str_to_upper(code),Y$name[X]))
+      }
+      
+      K %>%
+        select(-desc) %>%
+        mutate(
+          code=
+            Y$label[X] %>%
+            str_remove_all('\\*')
+        )
+      
+    }) %>%
+    do.call(rbind,.) %>%
+    filter(!duplicated(.)) %>%
+    select(-seq) %>%
+    
+    # Extract the day intervals.
+    extract_medical_history(cl=detectCores()-1) %>%
+    filter(!duplicated(.)) %>%
+    
+    # Join to the target visits.
+    right_join(
+      readRDS('data/target_visits.rds') %>%
+        select(-code)
+      ,by=c('visit_id'
+            ,'subject_id'
+            ,'healthcare_id'
+            ,'admission_date'
+            ,'db_start_date')
+    ) %>%
+    select(
+      visit_id
+      ,subject_id
+      ,healthcare_id
+      ,admission_date
+      ,db_start_date
+      ,everything()
+    )
+  
+  saveRDS(cf_provider,'data/cf_provider.rds')
+}else{
+  cat(readRDS('data/log.rds')[['cf_provider']])
+  cf_provider=readRDS('data/cf_provider.rds')
+}
+```
+
+```{r Sanity check for the number of visits and subjects, include=FALSE}
+source('R/outcome_visit_subject-function.R')
+```
+
+```{r Show sanity check results, eval=FALSE, include=FALSE}
+rbind(
+    readRDS('data/target_visits.rds') %>%
+      left_join(readRDS('data/outcome.rds'),by='subject_id') %>%
+      outcome_visit_subject('original')
+    
+    ,mh_nationwide %>%
+      left_join(readRDS('data/outcome.rds'),by='subject_id') %>%
+      outcome_visit_subject('nationwide')
+    
+    ,mh_provider %>%
+      left_join(readRDS('data/outcome.rds'),by='subject_id') %>%
+      outcome_visit_subject('provider')
+    
+    ,cf_nationwide %>%
+      left_join(readRDS('data/outcome.rds'),by='subject_id') %>%
+      outcome_visit_subject('nationwide, causal')
+    
+    ,cf_provider %>%
+      left_join(readRDS('data/outcome.rds'),by='subject_id') %>%
+      outcome_visit_subject('provider, causal')
+  ) %>%
+  kable() %>%
+  kable_classic()
+```
+
+```{r Build a function to personalize PROM tidy set, include=FALSE}
+source('R/prom_tidyset_personalization-function.R')
+```
+
+We need to ensure all inference using training set only. Data partition was 
+conducted before continuing the downstream analysis. Therefore, causal 
+inference did not use validation set.
+
+```{r Build a function to split for external validation, include=FALSE}
+source('R/extv-function.R')
+```
+
+```{r Compile tidy sets followed by data partitioning, include=FALSE}
+if(run_heavy_computation){
+  
+  # Nationwide data for inference by medical histories with splitting 
+  # information for external validation
+  inferdata=
+    mh_nationwide %>%
+    compile_mh_outcome(select(outcome,subject_id,latest_date,outcome)) %>%
+    prom_tidyset_personalization(
+      outcome=outcome
+      ,experimenter=
+        MIAME(
+          name='Herdiantri Sufriyana'
+          ,lab='Emily Chia-Yu Su Lab'
+          ,contact='herdiantrisufriyana@unusa.ac.id'
+          ,title='Medical history dataset for causal inference'
+          ,abstract=
+            str_replace_all(
+              'This dataset is a medical-history table from the BPJS Kesehatan.
+              The target population is health insurance holders of 
+              12-to-55-years-old females who visit healthcare providers between 
+              2015 and 2016. The outcome of interest is prelabor rupture of 
+              membrane (PROM). The medical history scenario is recorded across
+              healthcare providers nationwide.'
+              ,'\n',' '
+            ) %>%
+            str_replace_all('\\s+',' ')
+          ,url='https://github.com/herdiantrisufriyana/prom'
+        )
+      ,annotation=readRDS('data/annotation.rds')
+    ) %>%
+    extv(geo_p=0.12,tem_p=0.35,bgt_p=1,ran_p=0.2)
+  saveRDS(inferdata,'data/inferdata.rds')
+  
+  # Provider-wise data for prediction by medical histories with splitting 
+  # information for external validation
+  predidata=
+    mh_provider %>%
+    compile_mh_outcome(select(outcome,subject_id,latest_date,outcome)) %>%
+    prom_tidyset_personalization(
+      outcome=outcome
+      ,experimenter=
+        MIAME(
+          name='Herdiantri Sufriyana'
+          ,lab='Emily Chia-Yu Su Lab'
+          ,contact='herdiantrisufriyana@unusa.ac.id'
+          ,title='Medical history dataset for prediction'
+          ,abstract=
+            str_replace_all(
+              'This dataset is a medical-history table from the BPJS Kesehatan.
+              The target population is health insurance holders of 
+              12-to-55-years-old females who visit healthcare providers between 
+              2015 and 2016. The outcome of interest is prelabor rupture of 
+              membrane (PROM). The medical history scenario is recorded
+              individually within each healthcare provider nationwide.'
+              ,'\n',' '
+            ) %>%
+            str_replace_all('\\s+',' ')
+          ,url='https://github.com/herdiantrisufriyana/prom'
+        )
+      ,annotation=readRDS('data/annotation.rds')
+    ) %>%
+    extv(geo_p=0.12,tem_p=0.35,bgt_p=1,ran_p=0.2)
+  saveRDS(predidata,'data/predidata.rds')
+  
+  # Nationwide data for inference by causal factors with splitting information 
+  # for external validation
+  infercause=
+    cf_nationwide %>%
+    compile_mh_outcome(select(outcome,subject_id,latest_date,outcome)) %>%
+    prom_tidyset_personalization(
+      outcome=outcome
+      ,experimenter=
+        MIAME(
+          name='Herdiantri Sufriyana'
+          ,lab='Emily Chia-Yu Su Lab'
+          ,contact='herdiantrisufriyana@unusa.ac.id'
+          ,title='Medical history dataset for causal inference'
+          ,abstract=
+            str_replace_all(
+              'This dataset is a medical-history table from the BPJS Kesehatan.
+              The codes are re-assigned into causal factors (defined by regex).
+              The target population is health insurance holders of 
+              12-to-55-years-old females who visit healthcare providers between 
+              2015 and 2016. The outcome of interest is prelabor rupture of 
+              membrane (PROM). The medical history scenario is recorded across
+              healthcare providers nationwide.'
+              ,'\n',' '
+            ) %>%
+            str_replace_all('\\s+',' ')
+          ,url='https://github.com/herdiantrisufriyana/prom'
+        )
+      ,annotation=
+        dag$measure_nodes %>%
+        mutate(label=str_remove_all(label,'\\*')) %>%
+        rename(code=label,desc=name) %>%
+        select(code,desc)
+    ) %>%
+    extv(geo_p=0.12,tem_p=0.35,bgt_p=1,ran_p=0.2)
+  saveRDS(infercause,'data/infercause.rds')
+  
+  # Provider-wise data for prediction by causal factors with splitting 
+  # information for external validation
+  predicause=
+    cf_provider %>%
+    compile_mh_outcome(select(outcome,subject_id,latest_date,outcome)) %>%
+    prom_tidyset_personalization(
+      outcome=outcome
+      ,experimenter=
+        MIAME(
+          name='Herdiantri Sufriyana'
+          ,lab='Emily Chia-Yu Su Lab'
+          ,contact='herdiantrisufriyana@unusa.ac.id'
+          ,title='Medical history dataset for prediction'
+          ,abstract=
+            str_replace_all(
+              'This dataset is a medical-history table from the BPJS Kesehatan.
+              The codes are re-assigned into causal factors (defined by regex).
+              The target population is health insurance holders of 
+              12-to-55-years-old females who visit healthcare providers between 
+              2015 and 2016. The outcome of interest is prelabor rupture of 
+              membrane (PROM). The medical history scenario is recorded
+              individually within each healthcare provider nationwide.'
+              ,'\n',' '
+            ) %>%
+            str_replace_all('\\s+',' ')
+          ,url='https://github.com/herdiantrisufriyana/prom'
+        )
+      ,annotation=
+        dag$measure_nodes %>%
+        mutate(label=str_remove_all(label,'\\*')) %>%
+        rename(code=label,desc=name) %>%
+        select(code,desc)
+    ) %>%
+    extv(geo_p=0.12,tem_p=0.35,bgt_p=1,ran_p=0.2)
+  saveRDS(predicause,'data/predicause.rds')
+  
+}else{
+  inferdata=readRDS('data/inferdata.rds')
+  predidata=readRDS('data/predidata.rds')
+  infercause=readRDS('data/infercause.rds')
+  predicause=readRDS('data/predicause.rds')
+}
+```
+
+```{r Show data partition, eval=FALSE, include=FALSE}
+inferdata %>%
+  lapply(X=1,Y=.,function(X,Y){
+    
+    # Use phenotype and protocol data.
+    cbind(
+        pData(phenoData(Y))
+        ,pData(protocolData(Y))
+      ) %>%
+      separate(subject_id,c('subject_id','gestation_n'),sep='\\.') %>%
+      select(gestation_n,outcome,censoring,geo,tem,bgt,ran,int) %>%
+      gather(partition,value,-gestation_n,-outcome,-censoring) %>%
+      filter(value) %>%
+      
+      # Summarize number of instances 
+      # by outcome, censoring status, and partition.
+      group_by(gestation_n,outcome,censoring,partition) %>%
+      summarize(n=n(),.groups='drop') %>%
+      
+      # Compute the statistics.
+      group_by(partition) %>%
+      mutate(subtotal=sum(n)) %>%
+      ungroup() %>%
+      mutate(total=ncol(Y)) %>%
+      mutate(p=subtotal/total) %>%
+      
+      # Wrap up.
+      select(partition,subtotal,total,p) %>%
+      filter(!duplicated(.)) %>%
+      arrange(factor(partition,c('int','ran','geo','tem','bgt')))
+  }) %>%
+  .[[1]] %>%
+  kable() %>%
+  kable_classic()
+```
+
+## Step 8 to 9
+
+We conducted causal inference as described in the main text. This will help us 
+to include only the confirmed causal factors as candidate predictors before 
+conducting pre-selection of those candidates to fulfill quality control of 
+predictors in the main text. We included causal factors of which the data were 
+available in training set. Details on this information and ICD-10 codes or 
+demographical variables for each candidate of causal factors are shown in the 
+next section.
+
+```{r Unified causal diagram (caugram) plot function, include=FALSE}
+source('R/plot_dag-function.R')
+```
+
+```{r Show caugram, fig.height=10.5, fig.width=10.5, eval=FALSE, include=FALSE}
+dag$baseline_edges[,-3] %>%
+  plot_dag(0,mode='in',circular=T,plot.title='Causal diagram')
+```
+
+```{r Create interactive causal diagram, include=FALSE}
+pre_causal_diagram=
+  dag$baseline_edges[,-3] %>%
+  
+  # Join the node table as 'from'.
+  left_join(
+    dag$baseline_nodes %>%
+      rename(from=label) %>%
+      mutate(label=paste(from,name)) %>%
+      select(from,label)
+    ,by='from'
+  ) %>%
+  select(-from) %>%
+  rename(from=label) %>%
+  
+  # Join the node table as 'to'.
+  left_join(
+    dag$baseline_nodes %>%
+      rename(to=label) %>%
+      mutate(label=paste(to,name)) %>%
+      select(to,label)
+    ,by='to'
+  ) %>%
+  select(-to) %>%
+  rename(to=label)
+```
+
+```{r Show the interactive causal diagram, eval=FALSE, include=FALSE}
+pre_causal_diagram %>%
+  gather(key,id) %>%
+  select(id) %>%
+  filter(!duplicated(.)) %>%
+  mutate(label=id) %>%
+  arrange(id) %>%
+  mutate(
+    color=
+      unlist(mapply(
+        RColorBrewer::brewer.pal
+        ,RColorBrewer::brewer.pal.info %>%
+          .[.$category=='qual',] %>%
+          .$maxcolors
+        ,RColorBrewer::brewer.pal.info %>%
+          .[.$category=='qual',] %>%
+          rownames()
+      ))[seq(nrow(.))]
+  ) %>%
+  visNetwork(
+    pre_causal_diagram %>%
+      mutate(arrows='to')
+    ,width='100%'
+    ,height=700
+  ) %>%
+  visIgraphLayout(layout='layout_as_tree',root='Y01 PROM',mode='in',circular=T)
+```
+
+```{r Construct binary data of training set for causal inference, include=FALSE}
+if(run_heavy_computation){
+  cf_nw_int_bin=
+    infercause %>%
+    .[,pData(protocolData(.))$int] %>%
+    trans_binary(verbose=F)
+  
+  saveRDS(cf_nw_int_bin,'data/cf_nw_int_bin.rds')
+}else{
+  cf_nw_int_bin=readRDS('data/cf_nw_int_bin.rds')
+}
+```
+
+```{r Prepare formula for causal inference, include=FALSE}
+dag$formula$A02=outcome~A02+A20
+dag$backdoor$A02=c('A21','A25')
+
+dag$formula$A03=outcome~A03+A15+A28+A04
+dag$backdoor$A03=c('A08')
+
+dag$formula$A04=outcome~A04+A10+A11+A13+A02
+dag$backdoor$A04=c('A05','A21')
+
+dag$formula$A06=outcome~A06+A19+A20
+dag$backdoor$A06=c('A08','A09','A21','A25','A27')
+
+dag$formula$A10=outcome~A10
+dag$backdoor$A10=c('A14')
+
+dag$formula$A11=outcome~A11+A15+A20
+dag$backdoor$A11=c('A23','A22','A08')
+
+dag$formula$A12=outcome~A12+A02
+dag$backdoor$A12=c('A25')
+
+dag$formula$A13=outcome~A13+A15+A28
+dag$backdoor$A13=c()
+
+dag$formula$A15=outcome~A15+A28
+dag$backdoor$A15=c()
+
+dag$formula$A19=outcome~A19
+dag$backdoor$A19=c()
+
+dag$formula$A20=outcome~A20
+dag$backdoor$A20=c()
+
+dag$formula$A28=outcome~A28
+dag$backdoor$A28=c()
+```
+
+```{r Show an example of causal diagram for inference of a cause, include=FALSE}
+source('R/backdoor_path-function.R')
+```
+
+```{r Causal DAG function and the resulting images, include=FALSE}
+source('R/causal_dag-function.R')
+caudag_img=
+  dag$baseline_nodes %>%
+  
+  # Use only the first-level factors.
+  filter(str_sub(label,1,1)=='A') %>%
+  pull(label) %>%
+  
+  # For each factor, use it to make a causal diagram plot.
+  lapply(causal_dag)
+```
+
+```{r The DAG, fig.height=3.46457, fig.width=3.46457, eval=FALSE, include=FALSE}
+caudag_img
+```
+
+```{r Conduct logistic regression for causal inference, include=FALSE}
+# Fit the logistic regression.
+dag$glm=
+  dag$formula %>%
+  lapply(
+    FUN=glm
+    ,family=binomial(link='logit')
+    ,data=
+      cf_nw_int_bin %>%
+      pData() %>%
+      mutate(outcome=ifelse(censoring,NA,as.integer(outcome=='event'))) %>%
+      select(outcome) %>%
+      cbind(
+        cf_nw_int_bin %>%
+          exprs() %>%
+          t() %>%
+          as.data.frame()
+      )
+  )
+
+# Compute the OR and the 95% CI.
+dag$coef=
+  dag$glm %>%
+  lapply(tidy) %>%
+  lapply(
+    mutate
+    ,OR=exp(estimate)
+    ,OR_lb=exp(estimate-qnorm(0.975)*std.error)
+    ,OR_ub=exp(estimate+qnorm(0.975)*std.error)
+    ,Pr=OR/(1+OR)
+    ,Pr_lb=OR_lb/(1+OR_lb)
+    ,Pr_ub=OR_ub/(1+OR_ub)
+  )
+```
+
+```{r Conduct IPW for causal inference based on the causal diagram, include=FALSE}
+if(run_heavy_computation){
+  cat('Conduct IPW for causal inference based on the causal diagram\n')
+  cat('Started:',as.character(now()),'\n')
+  
+    dag$ipw=
+      
+      # Fit the IPW.
+      dag$formula %>%
+      lapply(
+        FUN=ipw
+        ,data=
+          cf_nw_int_bin %>%
+          pData() %>%
+          mutate(outcome=ifelse(censoring,NA,as.integer(outcome=='event'))) %>%
+          select(outcome) %>%
+          cbind(
+            cf_nw_int_bin %>%
+              exprs() %>%
+              t() %>%
+              as.data.frame()
+          )
+        ,bootstrap=30
+        ,state=33
+        ,verbose=T
+      ) %>%
+      
+      # Reduce the size of IPW object.
+      lapply(function(x){
+        x$data=NULL
+        x$index=NULL
+        x
+      })
+  
+  cat('End:',as.character(now()))
+  saveRDS(dag$ipw,'data/ipw.rds')
+}else{
+  cat(readRDS('data/log.rds')[['ipw']])
+  dag$ipw=readRDS('data/ipw.rds')
+}
+```
+
+```{r Save significant causal covariates, include=FALSE}
+dag$sig=
+  lapply(X=1:2,Y=dag$coef,Z=dag$ipw,function(X,Y,Z){
+    if(X==1){
+      # Logistic regression
+      sapply(Y,function(x){
+        ifelse(
+          between(1,round(x$OR_lb[2],4),round(x$OR_ub[2],4)) |
+          is.na(x$OR[2])
+          ,0,1
+        )
+      })
+    }else{
+      # IPW
+      sapply(Z,function(x){
+        ifelse(
+          between(0,round(x$CI95_interval[1],4),round(x$CI95_interval[2],4)) |
+          is.na(x$marginal_effect)
+          ,0,1
+        )
+      })
+    }
+  }) %>%
+  do.call(rbind,.) %>%
+  `rownames<-`(c('glm','ipw'))
+```
+
+```{r Show significant causal covariates, eval=FALSE, include=FALSE}
+dag$sig %>%
+  t() %>%
+  as.data.frame() %>%
+  rownames_to_column(var='variable') %>%
+  mutate_at(2:3,function(x)ifelse(x==1,'yes','no')) %>%
+  left_join(rename(dag$baseline_nodes,variable=label),by='variable') %>%
+  kable() %>%
+  kable_classic()
+```
+
+```{r The causes, fig.height=10.5, fig.width=10.5, eval=FALSE, include=FALSE}
+dag$baseline_edges[,-3] %>%
+  filter(
+    from %in% colnames(dag$sig)[dag$sig[2,]==1] &
+    to %in% c('Y01',colnames(dag$sig)[dag$sig[2,]==1])
+  ) %>%
+  plot_dag(0,'Y01 PROM','all',T)
+```
+
+## Step 10
+
+All candidate predictors, including non-demographical causal factors, have 
+non-zero variances. There were 460 candidate predictors fulfilling this 
+criterion. We also showed in the same table that there are 426 candidate 
+predictors without perfect separation.
+
+```{r Combine selected causal factors and medical histories, include=FALSE}
+# Nationwide data for inference by causal factors,
+# confirmed by IPW, and by medical histories
+inferboth=
+  ExpressionSet(
+    assayData=
+      rbind(
+        exprs(infercause) %>%
+          .[colnames(dag$sig)[dag$sig['ipw',]==1],,drop=F] %>%
+          `rownames<-`(paste0('causal_',rownames(.)))
+        ,exprs(inferdata)
+      )
+    ,phenoData=phenoData(inferdata)
+    ,featureData=
+      rbind(
+        fData(infercause) %>%
+          .[colnames(dag$sig)[dag$sig['ipw',]==1],,drop=F] %>%
+          `rownames<-`(paste0('causal_',rownames(.)))
+        ,fData(inferdata)
+      ) %>%
+      AnnotatedDataFrame(varMetadata=fvarMetadata(inferdata))
+    ,experimentData=
+      MIAME(
+        name='Herdiantri Sufriyana'
+        ,lab='Emily Chia-Yu Su Lab'
+        ,contact='herdiantrisufriyana@unusa.ac.id'
+        ,title='Medical history dataset for causal inference'
+        ,abstract=
+          str_replace_all(
+            'This dataset is a medical-history table from the BPJS Kesehatan.
+            Selected causal factors, that is re-assigned by regex, are added.
+            The target population is health insurance holders of 
+            12-to-55-years-old females who visit healthcare providers between 
+            2015 and 2016. The outcome of interest is prelabor rupture of 
+            membrane (PROM). The medical history scenario is recorded
+            individually within each healthcare provider nationwide.'
+            ,'\n',' '
+          ) %>%
+          str_replace_all('\\s+',' ')
+        ,url='https://github.com/herdiantrisufriyana/prom'
+      )
+    ,annotation=annotation(inferdata)
+    ,protocolData=protocolData(inferdata)
+  )
+
+# Provider-wise data for prediction by causal factors,
+# confirmed by IPW, and by medical histories
+prediboth=
+  ExpressionSet(
+    assayData=
+      rbind(
+        exprs(predicause) %>%
+          .[colnames(dag$sig)[dag$sig['ipw',]==1],,drop=F] %>%
+          `rownames<-`(paste0('causal_',rownames(.)))
+        ,exprs(predidata)
+      )
+    ,phenoData=phenoData(predidata)
+    ,featureData=
+      rbind(
+        fData(predicause) %>%
+          .[colnames(dag$sig)[dag$sig['ipw',]==1],,drop=F] %>%
+          `rownames<-`(paste0('causal_',rownames(.)))
+        ,fData(predidata)
+      ) %>%
+      AnnotatedDataFrame(varMetadata=fvarMetadata(predidata))
+    ,experimentData=
+      MIAME(
+        name='Herdiantri Sufriyana'
+        ,lab='Emily Chia-Yu Su Lab'
+        ,contact='herdiantrisufriyana@unusa.ac.id'
+        ,title='Medical history dataset for prediction'
+        ,abstract=
+          str_replace_all(
+            'This dataset is a medical-history table from the BPJS Kesehatan.
+            Selected causal factors, that is re-assigned by regex, are added.
+            The target population is health insurance holders of 
+            12-to-55-years-old females who visit healthcare providers between 
+            2015 and 2016. The outcome of interest is prelabor rupture of 
+            membrane (PROM). The medical history scenario is recorded
+            individually within each healthcare provider nationwide.'
+            ,'\n',' '
+          ) %>%
+          str_replace_all('\\s+',' ')
+        ,url='https://github.com/herdiantrisufriyana/prom'
+      )
+    ,annotation=annotation(predidata)
+    ,protocolData=protocolData(predidata)
+  )
+```
+
+```{r Candidate predictors with non-zero variances, eval=FALSE, include=FALSE}
+var_candidate_predictors=
+  
+  # Use only training set.
+  prediboth %>%
+  .[,pData(protocolData(.))$int] %>%
+  
+  # Get predictors and the outcome.
+  lapply(X=1,Y=.,function(X,Y){
+    exprs(Y) %>%
+      t() %>%
+      as.data.frame() %>%
+      cbind(select(pData(Y),'outcome'))
+  }) %>%
+  .[[1]] %>%
+  
+  # Summarize a standard deviation for each predictor per outcome.
+  select(outcome,everything()) %>%
+  gather(key,value,-outcome) %>%
+  group_by(key,outcome) %>%
+  summarize(sd_value=sd(value,na.rm=T),.groups='drop') %>%
+  arrange(factor(key,unique(key)),outcome) %>%
+  spread(outcome,sd_value) %>%
+  setNames(str_remove_all(names(.),'-')) %>% 
+  arrange(factor(key,rownames(prediboth)[rownames(prediboth)%in%key]))
+```
+
+```{r Train-set-based NPS predictors excluding outcome leaker, include=FALSE}
+# Select predictors without perfect separation problem.
+if(run_heavy_computation){
+  
+  int_nps=
+    prediboth %>%
+    .[,pData(protocolData(.))$int] %>%
+    extract_nps_mh() %>%
+    arrange(factor(key,rownames(prediboth)[rownames(prediboth)%in%key]))
+  
+  saveRDS(int_nps,'data/int_nps.rds')
+  
+}else{
+  int_nps=readRDS('data/int_nps.rds')
+}
+
+# Identify codes related to the end of pregnancy.
+outcome_leaker=
+  int_nps %>%
+  left_join(rename(annotation,key=code),by='key') %>%
+  filter(
+    str_detect(
+      str_to_lower(paste(key,desc))
+      ,paste0(c(
+        'abort'
+        ,'deliver'
+        ,'cesar'
+        ,'labou?r\\s+'
+        ,'natal'
+        ,'postpartum'
+        ,'terminat'
+        ,'o0[0123]'
+        ,'o152'
+        ,'o364'
+        ,'o63'
+        ,'o7[02]'
+        ,'o8[579]'
+        ,'o90'
+        ,'z3[79]'
+      ),collapse='|')
+    )
+  ) %>%
+  filter(!(
+    str_detect(
+      str_to_lower(paste(key,desc))
+      ,paste0(c(
+        'aborter'
+        ,'ante'
+        ,'peri'
+        ,'delayed'
+        ,'false'
+        ,'failed'
+        ,'prenatal'
+        ,'threatened'
+        ,'o311'
+        ,'z351'
+        ,'o600'
+        ,'o96'
+      ),collapse='|')
+    ) &
+    !str_detect(
+      str_to_lower(key)
+      ,paste0(c(
+        'o0[34568]'
+        ,'o15[12]'
+        ,'o7[02]'
+        ,'o8[79]'
+      ),collapse='|')
+    )
+  )) %>%
+  select(key,desc)
+
+# Exclude the outcome-leaker codes.
+int_nps_eol_p=
+  int_nps %>%
+  left_join(
+    outcome_leaker %>%
+      select(key) %>%
+      mutate(excluded=1)
+    ,by='key'
+  ) %>%
+  filter(is.na(excluded)) %>%
+  select(-excluded)
+```
+
+```{r Non-zero variance and no perfect separation, eval=FALSE, include=FALSE}
+var_candidate_predictors %>%
+  
+  # Exclude predictors that do not exist in training set.
+  filter(!(nonevent==0 & event==0)) %>%
+  
+  # Join predictors without perfect separation problem.
+  left_join(
+    prediboth %>%
+      .[,pData(protocolData(.))$int] %>%
+      extract_nps_mh() %>%
+      arrange(factor(key,rownames(prediboth)[rownames(prediboth)%in%key])) %>%
+      mutate(perfect_separation='No')
+    ,by=c('key','nonevent','event')
+  ) %>%
+  mutate(
+    perfect_separation=
+      ifelse(is.na(perfect_separation),'Yes',perfect_separation)
+  ) %>%
+  
+  # Join combined annotation tables of medical histories and causal factors.
+  left_join(
+    rename(annotation,key=code) %>%
+      rbind(
+        dag$baseline_nodes %>%
+          mutate(label=paste0('causal_',label)) %>%
+          rename(desc=name,key=label) %>%
+          select(key,desc)
+      )
+    ,by='key'
+  ) %>%
+  rename(candidate_predictor=key,description=desc) %>%
+  setNames(str_to_title(colnames(.)) %>% str_replace_all('_',' ')) %>%
+  
+  kable() %>%
+  kable_classic()
+```
+
+We excluded the diagnosis/procedure codes that may leak the outcome 
+information. We only used the existing codes in the training set to determine 
+outcome-leaker codes based on the previous codes for determining delivery or 
+immediately after delivery care. There were 54 codes that may leak the outcome. 
+All of them were also irredundant.
+
+```{r Save outcome leakers, eval=FALSE, include=FALSE}
+outcome_leaker %>%
+  arrange(key) %>%
+  rename(code=key,description=desc) %>%
+  setNames(str_to_title(colnames(.))) %>%
+  
+  kable() %>%
+  kable_classic()
+```
+
+```{r Correlations of candidate predictors, eval=FALSE, include=FALSE}
+cor_predictors=
+  
+  # Use only training set.
+  prediboth %>%
+  .[,pData(protocolData(.))$int] %>%
+  
+  # Get predictors and the outcome.
+  lapply(X=1,Y=.,function(X,Y){
+    exprs(Y) %>%
+      t() %>%
+      as.data.frame() %>%
+      cbind(select(pData(Y),'outcome'))
+  }) %>%
+  .[[1]] %>%
+  
+  # Get only predictors without perfect separation problem and not outcome leakers. 
+  select(outcome,everything()) %>%
+  mutate_all(function(x)ifelse(is.na(x),0,x)) %>%
+  .[,int_nps_eol_p$key] %>%
+  
+  # Compute inter-predictor Pearson correlation coefficients.
+  cor()
+```
+
+```{r Save and show the inter-predictor correlations, eval=FALSE, include=FALSE}
+# Save the correlation coefficients.
+cor_predictors %>%
+  as.data.frame() %>%
+  rownames_to_column(var=' ') %>%
+  
+  kable() %>%
+  kable_classic()
+
+# Show the correlation coefficients.
+cor_predictors %>%
+  
+  # Remove auto-correlations.
+  as.data.frame() %>%
+  rownames_to_column(var='first') %>%
+  gather(second,pearson_correlation_r,-first) %>%
+  filter(first!=second) %>%
+  
+  # Remove redundant correlations.
+  mutate(pair=seq(nrow(.))) %>%
+  gather(order,predictor,-pair,-pearson_correlation_r) %>%
+  group_by(pair) %>%
+  arrange(pair,predictor) %>%
+  mutate(order=c('first','second')) %>%
+  ungroup() %>%
+  spread(order,predictor) %>%
+  select(-pair) %>%
+  filter(!duplicated(.)) %>%
+  
+  # Filter the high-correlated pair of predictors.
+  filter(pearson_correlation_r>0.7) %>%
+  
+  # Join regular expression of the coding components of causal factors 
+  # to check if the high-correlated pairs are due to these components.
+  left_join(
+    dag$baseline_nodes %>%
+      mutate(label=paste0('causal_',label)) %>%
+      rename(first=label) %>%
+      select(first,name)
+    ,by='first'
+  ) %>%
+  left_join(
+    dag$measure_nodes %>%
+      mutate(label=paste0('causal_',str_remove_all(label,'\\*'))) %>%
+      rename(regular_expression=name,first=label) %>%
+      select(first,regular_expression)
+    ,by='first'
+  )
+```
+
+By systematic human learning and causal inference using available data, we also 
+determined causal factors as the candidate predictors. There were 27 first- and 
+10 second-level factors of PROM. Only data for 12 out of 27 causal factors were 
+available in training set. Either the diagnosis/procedure codes, or 
+demographical variables (not included as candidate predictors), for causal 
+factors are also described.
+
+```{r Save results of systematic human learning, eval=FALSE, include=FALSE}
+dag$baseline_nodes %>%
+  
+  # Get all the first-level factors.
+  filter(name!='PROM') %>%
+  
+  # Pair with the effect.
+  left_join(
+    dag$factor %>%
+      filter(dependent_factor!='Preterm birth') %>%
+      select(dependent_factor,independent_factor,citation) %>%
+      rename(effect_on=dependent_factor,name=independent_factor)
+    ,by='name'
+  ) %>%
+  rename(factor=name) %>%
+  
+  # Identify the factor levels.
+  mutate(level=ifelse(str_detect(label,'A'),'First','Second')) %>%
+  select(level,effect_on,everything()) %>%
+  
+  # Add information about the data availability.
+  left_join(
+    data.frame(label=rownames(cf_nw_int_bin),data_availability='Yes')
+    ,by='label'
+  ) %>%
+  mutate(
+    data_availability=
+      ifelse(
+        !is.na(data_availability) & effect_on=='PROM'
+        ,'Yes','No'
+      )
+  ) %>%
+  
+  # Add information about the model (formula).
+  left_join(
+    dag$formula %>%
+      lapply(X=names(.),Y=.,function(X,Y){
+        Z=as.character(Y[[X]])
+        data.frame(label=X,mathematical_model=paste0(Z[2],' ~ ',Z[3]))
+      }) %>%
+      do.call(rbind,.) %>%
+      mutate(effect_on='PROM')
+    ,by=c('label','effect_on')
+  ) %>%
+  
+  arrange(
+    level
+    ,factor(effect_on,dag$baseline_nodes$name)
+    ,factor(factor,dag$baseline_nodes$name)
+  ) %>%
+  setNames(str_to_title(colnames(.)) %>% str_replace_all('_',' ')) %>%
+  
+  kable() %>%
+  kable_classic()
+```
+
+```{r Save codes and demographics for causal factors, eval=FALSE, include=FALSE}
+dag$measure_nodes %>%
+  
+  # Get the regular expression to define causal factors.
+  mutate(label=str_remove_all(label,'\\*')) %>%
+  rename(regular_expression=name) %>%
+  
+  # Add the description.
+  left_join(dag$baseline_nodes,by='label') %>%
+  filter(label!='Y01') %>%
+  mutate(label=paste0('causal_',label)) %>%
+  rename(causal_factor=name,variable=label) %>%
+  select(causal_factor,variable,regular_expression) %>%
+  
+  # Based on the regular expression, gather the ICD-10 codes that apply.
+  lapply(X=seq(nrow(.)),Y=.,function(X,Y){
+    
+    Z=Y$regular_expression[X]
+    
+    if(str_detect(Z,'\\(|\\)')){
+      
+      K=str_split(Z,'\\(|\\)')[[1]]
+      
+      L=K[2] %>%
+        str_split('\\|') %>%
+        .[[1]] %>%
+        sapply(X=seq(length(.)),Y=.,Z=K[1],function(X,Y,Z){
+          paste0(Z,Y[X])
+        })
+      
+    }else{
+      
+      K=str_split(Z,'\\|')[[1]]
+      
+      L=K %>%
+        lapply(X=seq(length(.)),Y=.,function(X,Y){
+          if(str_detect(Y[X],'\\[|\\]')){
+            
+            Z=str_split(Y[X],'\\[|\\]')[[1]]
+            
+            if(str_detect(Z[2],'\\^')){
+              
+              K=Z[2] %>%
+                str_remove_all('\\^')
+              
+              paste0(0:9,collapse='') %>%
+                str_remove_all(K) %>%
+                sapply(X=seq(str_count(.)),Y=.,Z=Z[1],function(X,Y,Z){
+                  paste0(Z,str_sub(Y,X,X))
+                })
+              
+            }else if(str_detect(Z[2],'\\-')){
+              
+              K=Z[2] %>%
+                str_split_fixed('\\-',2)
+              
+              paste0(K[1]:K[2],collapse='') %>%
+                sapply(X=seq(str_count(.)),Y=.,Z=Z[1],function(X,Y,Z){
+                  paste0(Z,str_sub(Y,X,X))
+                })
+              
+            }else{
+              
+              Z[2] %>%
+                sapply(X=seq(str_count(.)),Y=.,Z=Z[1],function(X,Y,Z){
+                  paste0(Z,str_sub(Y,X,X))
+                })
+              
+            }
+            
+          }else{
+            
+            Y[X]
+            
+          }
+        }) %>%
+        unlist()
+      
+    }
+    
+    data.frame(
+      causal_factor=Y$causal_factor[X]
+      ,variable=Y$variable[X]
+      ,regular_expression=Y$regular_expression[X]
+      ,code=L
+    )
+    
+  }) %>%
+  do.call(rbind,.) %>%
+  select(-regular_expression) %>%
+  
+  # Add information related to demographics.
+  lapply(
+    X=seq(nrow(.))
+    ,Y=.
+    ,Z=
+      annotation %>%
+      rbind(
+        readRDS('data/cat_identity.rds') %>%
+          mutate(
+            code=
+              desc %>%
+              str_to_lower() %>%
+              sapply(
+                str_remove_all
+                ,paste0(
+                  c('age'
+                    ,'householder'
+                    ,str_replace_all(colnames(outcome),'_',' '))
+                  ,collapse='|'
+                )
+              ) %>%
+              str_to_upper() %>%
+              trimws()
+          )
+      )
+    ,function(X,Y,Z){
+    
+      Z %>%
+        filter(str_detect(code,Y$code[X])) %>%
+        mutate(
+          causal_factor=Y$causal_factor[X]
+          ,variable=Y$variable[X]
+        )
+  }) %>%
+  do.call(rbind,.) %>%
+  
+  select(causal_factor,variable,everything()) %>%
+  rename(demographics_or_medical_history=code,description=desc) %>%
+  setNames(str_to_title(colnames(.)) %>% str_replace_all('_',' ')) %>%
+  
+  kable() %>%
+  kable_classic()
+```
+
+Features were extracted on irredundant candidate predictors with non-zero 
+variances and no perfect separation in training set only. The candidate 
+predictors were transformed into binaries in all data partitions.
+
+```{r Tranform into binaries, include=FALSE}
+if(run_heavy_computation){
+  pw_bin=
+    prediboth %>%
+    .[int_nps_eol_p$key,] %>%
+    trans_binary(verbose=F)
+  
+  saveRDS(pw_bin,'data/pw_bin.rds')
+}else{
+  pw_bin=readRDS('data/pw_bin.rds')
+}
+```
+
+```{r Show the outcome and censoring in training set, eval=FALSE, include=FALSE}
+pw_bin %>%
+  .[,pData(protocolData(.))$int] %>%
+  pData() %>%
+  select(outcome,censoring) %>%
+  table()
+```
+
+Previous data partition had not held out instances for calibration yet. This 
+took 80% of training set. We also gave different weights for event and nonevent 
+by including censored outcome For hyperparameter tuning, we applied 5-fold 
+cross validation, instead of 10-fold as applied for PC modeling. Meanwhile, the 
+final training and calibration for each model were conducted by bootstrapping 
+for 30 times. The same resampling methods were applied for both classification 
+and estimation tasks. We applied the tuning grids and the training 
+configurations.
+
+```{r Build a function to get set for training or testing, include=FALSE}
+source('R/get_set-function.R')
+```
+
+```{r Prepare train set and parameters, include=FALSE}
+# Create an empty list to save training parameters.
+training_parameters=list()
+
+# Hold out 20% of training set for calibration.
+suppressWarnings(set.seed(66,sample.kind=sample.kind))
+training_parameters$pre_calib_set=
+  
+  # Training set
+  pw_bin %>%
+  .[,pData(protocolData(.))$int] %>%
+  pData() %>%
+  rownames_to_column(var='id') %>%
+  
+  # Uncensored outcome
+  filter(!censoring) %>%
+  
+  # Get 80% for pre-calibrated set.
+  lapply(X=1,Y=.,function(X,Y){
+    Z=createDataPartition(Y$outcome,times=1,p=0.8)
+    Y$id[Z$Resample1]
+  }) %>%
+  .[[1]]
+
+# Compute outcome weights.
+training_parameters$outcome_weights=
+  
+  # Training set
+  pw_bin %>%
+  .[,pData(protocolData(.))$int] %>%
+  pData() %>%
+  select(outcome,censoring) %>%
+  
+  # Compute the probabilities, taking censoring into account.
+  cbind(
+    table(.) %>%
+      as.numeric() %>%
+      setNames(c('nonevent_uncensored','event_uncensored'
+                 ,'nonevent_censored','event_censored')) %>%
+      t() %>%
+      as.data.frame() %>%
+      mutate(
+        total=
+          nonevent_uncensored+
+          nonevent_censored+
+          event_uncensored+
+          event_censored
+        ,nonevent_prob=nonevent_uncensored/total
+        ,event_prob=event_uncensored/total
+      ) %>%
+      select(nonevent_prob,event_prob)
+  ) %>%
+  rownames_to_column(var='id') %>%
+  
+  # Uncensored outcome
+  filter(!censoring) %>%
+  select(-censoring) %>%
+  
+  # Compute the weight from half od the inverse probability.
+  mutate(
+    weight=
+      ifelse(
+        outcome=='event'
+        ,(1/event_prob)*0.5
+        ,(1/nonevent_prob)*0.5
+      )
+  ) %>%
+  column_to_rownames(var='id') %>%
+  select(weight)
+
+# Define classification tuning to apply 5-fold cross validation.
+training_parameters$tuning_trControl=
+  trainControl(
+    method='cv'
+    ,number=5
+    ,summaryFunction=twoClassSummary
+    ,classProbs=T
+    ,savePredictions=T
+    ,allowParallel=T
+  )
+
+# Define classification training to apply 30-time bootstrapping.
+training_parameters$final_trControl=
+  trainControl(
+    method='boot'
+    ,number=30
+    ,summaryFunction=twoClassSummary
+    ,classProbs=T
+    ,savePredictions=T
+    ,allowParallel=T
+  )
+
+# Define estimation tuning to apply 5-fold cross validation.
+training_parameters$timereg_tuning_trControl=
+  trainControl(
+    method='cv'
+    ,number=5
+    ,savePredictions=F
+    ,allowParallel=T
+  )
+
+# Define estimation training to apply 30-time bootstrapping.
+training_parameters$timereg_final_trControl=
+  trainControl(
+    method='boot'
+    ,number=30
+    ,savePredictions=F
+    ,allowParallel=T
+  )
+```
+
+```{r Build a function for caret training and evaluation, include=FALSE}
+source('R/caret_trainer_evaluator-function.R')
+```
+
+```{r Empty lists to save model and the evaluation results, include=FALSE}
+model=list()
+calib_model=list()
+eval_model=list()
+```
+
+```{r Conduct causal ridge regression by parallel computing, include=FALSE}
+if(run_heavy_computation){
+  c(model$causal_ridge
+    ,calib_model$causal_ridge
+    ,eval_model$causal_ridge) %<-% caret_trainer_evaluator(
+      data=
+        pw_bin %>%
+        .[rownames(.) %>% .[str_detect(.,'causal')],]
+      ,method='glmnet'
+      ,calib_method='glm'
+      ,tuning=data.frame(alpha=0,lambda=10^seq(-9,0,len=10))
+      ,training=training_parameters
+      ,title='Conduct causal ridge regression by parallel computing'
+      ,dir='data'
+      ,file='causal_ridge'
+      ,cl=detectCores()/2
+    )
+}else{
+  cat(readRDS('data/log.rds')[['causal_ridge']])
+  c(model$causal_ridge
+    ,calib_model$causal_ridge
+    ,eval_model$causal_ridge) %<-% list(
+      readRDS('data/causal_ridge.rds')
+      ,readRDS('data/calib_causal_ridge.rds')
+      ,readRDS('data/eval_causal_ridge.rds')
+    )
+}
+```
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
