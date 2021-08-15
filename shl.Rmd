@@ -204,8 +204,8 @@ rbind(
     
   ) %>%
   setNames(str_to_sentence(colnames(.))) %>%
-  group_by(Base,Loaded,Attached) %>%
-  summarize(n=n())
+  # group_by(Base,Loaded,Attached) %>%
+  # summarize(n=n())
   
   kable() %>%
   kable_classic()
