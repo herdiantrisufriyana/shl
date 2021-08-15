@@ -59,7 +59,7 @@ provided pre-existing files to substitute the expensive computation. One can
 set a variable that defines whether the expensive parts will be conducted. This 
 may take from hours to 2 days to be completed.
 
-We also provide small datasets to demo the 2 packages we made for this study. 
+We also provide small datasets to demo the 2 packages we made for this protocol. 
 Please follow through the vignettes. These show simple examples to demo the 
 packages.
 
@@ -67,7 +67,7 @@ packages.
 ## Instructions for use
 
 Briefly, all system requirements, installation guide, demo, and instructions 
-for use are available in R Markdown (prom.Rmd) and other files in this 
+for use are available in R Markdown (shl.Rmd) and other files in this 
 repository.
 
 The R Markdown (.Rmd) contains the same texts with this document but including 
@@ -82,6 +82,6 @@ December 2020. For the first and second versions, a request is applied via
 https://e-ppid.bpjs-kesehatan.go.id/, while the third is applied via 
 https://data.bpjs-kesehatan.go.id.
 
-To preprocess the raw data into the input dataset of this study, follow the 
+To preprocess the raw data into the input dataset of this protocol, follow the 
 codes of the R Markdown in data.Rmd: 
 https://github.com/herdiantrisufriyana/medhist/tree/main/preprocessing.
